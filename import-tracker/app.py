@@ -524,12 +524,19 @@ def export_camion(request: Request, invoice_id: int, user=Depends(require_user))
 
 # --- Справочники (TRANSIT / НОВИНКИ) --------------------------------------
 @app.get("/references", response_class=HTMLResponse)
-def references_page(request: Request, user=Depends(require_user), msg: str = ""):
+def references_page(request: Request, user=Depends(require_user), msg: str = "",
+                    q: str = "", source: str = "", page: int = 1):
     if user["role"] != "admin":
         raise HTTPException(403, "Только для администратора")
+    per = 50
+    page = max(1, page)
+    rows, total = db.ref_search(q.strip(), source, limit=per, offset=(page - 1) * per)
+    pages = max(1, (total + per - 1) // per)
     return templates.TemplateResponse(
         request, "references.html",
-        {"user": user, "stats": db.ref_stats(), "msg": msg, "nav": "references"},
+        {"user": user, "stats": db.ref_stats(), "msg": msg, "nav": "references",
+         "rows": rows, "total": total, "q": q, "source": source,
+         "page": page, "pages": pages, "per": per},
     )
 
 

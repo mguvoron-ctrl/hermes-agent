@@ -603,6 +603,28 @@ def ref_get_many(articles: list[str]) -> dict:
     return out
 
 
+def ref_search(q: str = "", source: str = "", limit: int = 50, offset: int = 0):
+    """Поиск/просмотр справочника с фильтром по источнику и пагинацией."""
+    where, params = [], []
+    if source in ("transit", "novinki"):
+        where.append("source = ?")
+        params.append(source)
+    if q:
+        where.append("(article LIKE ? OR name_rus LIKE ? OR hs_code LIKE ? OR ean LIKE ?)")
+        qa = f"%{q.upper()}%"
+        qp = f"%{q}%"
+        params += [qa, qp, qp, qp]
+    wsql = (" WHERE " + " AND ".join(where)) if where else ""
+    conn = get_conn()
+    total = conn.execute("SELECT COUNT(*) c FROM article_ref" + wsql, params).fetchone()["c"]
+    rows = conn.execute(
+        "SELECT * FROM article_ref" + wsql + " ORDER BY article LIMIT ? OFFSET ?",
+        params + [limit, offset],
+    ).fetchall()
+    conn.close()
+    return rows, total
+
+
 def ref_stats() -> dict:
     conn = get_conn()
     total = conn.execute("SELECT COUNT(*) c FROM article_ref").fetchone()["c"]

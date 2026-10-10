@@ -31,6 +31,56 @@
 </div>
 
 <div class="card">
+  <h2>Просмотр справочника</h2>
+  <form method="get" action="/references" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px">
+    <input type="text" name="q" value="{{ q }}" placeholder="поиск: артикул, название, код ТН ВЭД, EAN" style="flex:1; min-width:220px">
+    <select name="source" style="flex:0 0 190px">
+      <option value="" {{ 'selected' if source=='' else '' }}>Все источники</option>
+      <option value="transit" {{ 'selected' if source=='transit' else '' }}>только TRANSIT</option>
+      <option value="novinki" {{ 'selected' if source=='novinki' else '' }}>только НОВИНКИ</option>
+    </select>
+    <button class="btn" type="submit">Найти</button>
+    {% if q or source %}<a class="btn ghost sm" href="/references">Сбросить</a>{% endif %}
+  </form>
+
+  <p class="muted" style="margin-top:-4px">Найдено: {{ total }}{% if q or source %} (по фильтру){% endif %}.</p>
+
+  {% if rows %}
+  <div class="scroll-x">
+  <table class="striped goods">
+    <thead>
+      <tr><th>Артикул</th><th>ТН ВЭД</th><th>EAN</th><th>Наименование (рус)</th><th>Страна</th><th>Производитель</th><th>Источник</th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="mono">{{ r.article }}</td>
+        <td class="mono muted">{{ r.hs_code or "—" }}</td>
+        <td class="mono muted">{{ r.ean or "—" }}</td>
+        <td class="nm-ru">{{ r.name_rus or "—" }}</td>
+        <td>{{ r.origin or "—" }}</td>
+        <td>{{ r.producer or "—" }}</td>
+        <td><span class="badge {{ 'ok' if r.source=='transit' else 'accent' }}">{{ 'TRANSIT' if r.source=='transit' else 'Новинки' }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% if pages > 1 %}
+  <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap">
+    {% set qs = "q=" ~ q ~ "&source=" ~ source %}
+    {% if page > 1 %}<a class="btn sm ghost" href="/references?{{ qs }}&page={{ page-1 }}">← Назад</a>{% endif %}
+    <span class="muted">Страница {{ page }} из {{ pages }}</span>
+    {% if page < pages %}<a class="btn sm ghost" href="/references?{{ qs }}&page={{ page+1 }}">Вперёд →</a>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <p class="empty">Ничего не найдено.</p>
+  {% endif %}
+</div>
+
+<div class="card">
   <h2>Загрузить НОВИНКИ</h2>
   <p class="muted" style="margin-top:-6px">Файлы новинок по брендам (.xlsx и .xlsb). Добавят артикулы,
      которых ещё нет в TRANSIT. Можно выбрать сразу несколько файлов.</p>
