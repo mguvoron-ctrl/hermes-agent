@@ -75,14 +75,20 @@
   </div>
 </div>
 
-{% if items %}
-<div class="card">
-  <h2>Товары <span class="muted" style="font-weight:500">({{ items|length }})</span></h2>
+<div class="card" id="goods-card">
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+    <h2 style="margin:0">Товары <span class="muted" style="font-weight:500">({{ items|length }})</span></h2>
+    <button class="btn sm ghost" style="margin-left:auto" type="button" onclick="startEditGoods()">✏️ Изменить таблицу</button>
+  </div>
+
+  <div id="goods-read" style="margin-top:12px">
+  {% if items %}
   <div class="scroll-x">
-  <table class="striped">
+  <table class="striped goods">
     <thead>
       <tr>
-        <th>ТН ВЭД</th><th>Артикул</th><th>Наименование</th>
+        <th>ТН ВЭД</th><th>Артикул</th><th>EAN</th>
+        <th>Наименование (рус)</th><th>Название (англ)</th><th>Страна</th>
         <th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th>
         <th class="num">Нетто</th><th class="num">Брутто</th><th class="num">Коробки</th>
       </tr>
@@ -92,22 +98,22 @@
       <tr>
         <td class="mono muted">{{ it.hs_code }}</td>
         <td class="mono">{{ it.item_code }}</td>
-        <td>{{ it.name }}
-          {% if it.name_en and it.name_en != it.name %}<div class="muted" style="font-size:12px">{{ it.name_en }}</div>{% endif %}
-          <div class="muted" style="font-size:11px">{% if it.barcode %}{{ it.barcode }}{% endif %}{% if it.origin %} · {{ it.origin }}{% endif %}</div>
-        </td>
+        <td class="mono muted">{{ it.barcode or "—" }}</td>
+        <td class="nm-ru">{{ it.name }}</td>
+        <td class="muted">{{ it.name_en or "—" }}</td>
+        <td>{{ it.origin or "—" }}</td>
         <td class="num">{{ it.qty }}</td>
         <td class="num">{{ it.unit_price }}</td>
         <td class="num">{{ it.total_price }}</td>
-        <td class="num">{{ it.net_weight }}</td>
-        <td class="num">{{ it.gross_weight }}</td>
-        <td class="num">{{ it.box_count }}</td>
+        <td class="num">{{ it.net_weight or "—" }}</td>
+        <td class="num">{{ it.gross_weight or "—" }}</td>
+        <td class="num">{{ it.box_count or "—" }}</td>
       </tr>
     {% endfor %}
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="3">Итого</td>
+        <td colspan="6">Итого</td>
         <td class="num">{{ totals.qty }}</td>
         <td></td>
         <td class="num">{{ totals.total_price }}</td>
@@ -118,8 +124,98 @@
     </tfoot>
   </table>
   </div>
+  {% else %}
+  <p class="empty">Товаров нет. Нажми «Изменить таблицу», чтобы добавить вручную, или загрузи Excel.</p>
+  {% endif %}
+  </div>{# /goods-read #}
+
+  <form id="goods-edit" method="post" action="/invoices/{{ invoice.id }}/items" style="display:none; margin-top:12px">
+    <p class="ed-hint">Правь ячейки прямо здесь. Можно вставить данные из Excel: скопируй диапазон в Excel
+       и вставь (Ctrl+V) в нужную ячейку — заполнится сразу несколько ячеек и строк.</p>
+    <div class="scroll-x" style="border:none"><div id="goods-editor"></div></div>
+    <input type="hidden" name="data" id="goods-data">
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+      <button class="btn sm ghost" type="button" onclick="addGoodRow()">+ строка</button>
+      <span style="flex:1"></span>
+      <button class="btn sm" type="submit" onclick="return collectGoods()">Сохранить</button>
+      <button class="btn sm ghost" type="button" onclick="cancelEditGoods()">Отмена</button>
+    </div>
+  </form>
 </div>
-{% endif %}
+
+<script id="goods-json" type="application/json">{{ items_json|safe }}</script>
+<script>
+const GOODS_COLS=[
+  {k:'hs_code',l:'ТН ВЭД'},{k:'item_code',l:'Артикул'},{k:'barcode',l:'EAN'},
+  {k:'name',l:'Наименование (рус)',wide:true},{k:'name_en',l:'Название (англ)',wide:true},{k:'origin',l:'Страна'},
+  {k:'qty',l:'Кол-во'},{k:'unit_price',l:'Цена'},{k:'total_price',l:'Сумма'},
+  {k:'net_weight',l:'Нетто'},{k:'gross_weight',l:'Брутто'},{k:'box_count',l:'Коробки'}
+];
+let GOODS_DATA=[];
+try{ GOODS_DATA=JSON.parse(document.getElementById('goods-json').textContent||'[]'); }catch(e){ GOODS_DATA=[]; }
+
+function _val(s){ return (s==null?'':String(s)); }
+
+function appendRow(body,row){
+  const tr=document.createElement('tr');
+  let html='<td class="rowdel" title="удалить строку" onclick="this.parentElement.remove()">✕</td>';
+  GOODS_COLS.forEach((c,ci)=>{
+    const v=_val(row[c.k]).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    html+='<td><input data-c="'+ci+'" class="'+(c.wide?'wide':'')+'" value="'+v+'"></td>';
+  });
+  tr.innerHTML=html;
+  body.appendChild(tr);
+  return tr;
+}
+function addGoodRow(){ return appendRow(document.getElementById('ged-body'),{}); }
+
+function buildGoodsEditor(){
+  const host=document.getElementById('goods-editor');
+  let html='<table class="ed-grid"><thead><tr><th></th>';
+  GOODS_COLS.forEach(c=>html+='<th>'+c.l+'</th>');
+  html+='</tr></thead><tbody id="ged-body"></tbody></table>';
+  host.innerHTML=html;
+  const body=document.getElementById('ged-body');
+  const data=GOODS_DATA.length?GOODS_DATA:[{}];
+  data.forEach(r=>appendRow(body,r));
+  body.addEventListener('paste',function(e){
+    const inp=e.target;
+    if(!inp||inp.tagName!=='INPUT') return;
+    const text=(e.clipboardData||window.clipboardData).getData('text');
+    if(!/[\t\n]/.test(text)) return;           // одиночное значение — обычная вставка
+    e.preventDefault();
+    const startC=+inp.dataset.c;
+    const rows=text.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(r=>r.split('\t'));
+    let tr=inp.closest('tr');
+    rows.forEach(cells=>{
+      if(!tr) tr=addGoodRow();
+      const inputs=tr.querySelectorAll('input');
+      cells.forEach((val,ci)=>{ const t=inputs[startC+ci]; if(t) t.value=val; });
+      tr=tr.nextElementSibling;
+    });
+  });
+}
+
+function startEditGoods(){
+  buildGoodsEditor();
+  document.getElementById('goods-read').style.display='none';
+  document.getElementById('goods-edit').style.display='block';
+}
+function cancelEditGoods(){
+  document.getElementById('goods-edit').style.display='none';
+  document.getElementById('goods-read').style.display='';
+}
+function collectGoods(){
+  const rows=[];
+  document.querySelectorAll('#ged-body tr').forEach(tr=>{
+    const o={};
+    tr.querySelectorAll('input').forEach(inp=>{ o[GOODS_COLS[+inp.dataset.c].k]=inp.value; });
+    rows.push(o);
+  });
+  document.getElementById('goods-data').value=JSON.stringify(rows);
+  return true;
+}
+</script>
 
 <div class="card">
   <h2>Этапы процесса</h2>

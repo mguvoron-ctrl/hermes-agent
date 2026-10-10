@@ -9,6 +9,7 @@
 """
 
 import os
+import json
 import secrets
 import shutil
 import tempfile
@@ -263,6 +264,10 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
         files_by_step.setdefault(f["step_id"], []).append(f)
     items = db.get_items(invoice_id)
     totals = _item_totals(items)
+    items_json = json.dumps(
+        [{k: (it[k] or "") for k in ITEM_FIELDS} for it in items],
+        ensure_ascii=False,
+    )
     return templates.TemplateResponse(
         request, "invoice.html",
         {
@@ -270,9 +275,32 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
             "shipment": shipment, "steps": steps, "files": files,
             "files_by_step": files_by_step, "progress": db.progress(invoice_id),
             "statuses": db.STATUSES, "items": items, "totals": totals,
-            "nav": "invoices",
+            "items_json": items_json, "nav": "invoices",
         },
     )
+
+
+ITEM_FIELDS = ["hs_code", "item_code", "barcode", "name", "name_en", "origin",
+               "qty", "unit_price", "total_price", "net_weight", "gross_weight", "box_count"]
+
+
+@app.post("/invoices/{invoice_id}/items")
+def save_items(request: Request, invoice_id: int, data: str = Form(...),
+               user=Depends(require_user)):
+    """Сохранить вручную отредактированную таблицу товаров."""
+    try:
+        rows = json.loads(data)
+    except (ValueError, TypeError):
+        rows = []
+    clean = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        it = {k: str(r.get(k, "") or "").strip() for k in ITEM_FIELDS}
+        if any(it.values()):  # пропускаем полностью пустые строки
+            clean.append(it)
+    db.replace_items(invoice_id, clean)
+    return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
 
 
 def _num(x) -> float:

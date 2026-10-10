@@ -132,14 +132,32 @@
     .legend{display:flex; gap:18px; flex-wrap:wrap; color:var(--muted); font-size:12.5px; margin-top:12px}
     .legend span{display:inline-flex; align-items:center; gap:6px}
 
-    /* полосатая таблица товаров + итоги + сетка ячеек */
+    /* полосатая таблица товаров + итоги + мягкая сетка ячеек */
     table.striped tbody tr:nth-child(odd){background:#fafbfd}
-    table.striped tbody tr:hover{background:#f2f6ff}
-    table.striped th, table.striped td{border-right:1px solid var(--line)}
+    table.striped tbody tr:hover{background:#eef4ff}
+    table.striped th, table.striped td{border-right:1px solid #edf0f4}
     table.striped th:last-child, table.striped td:last-child{border-right:none}
-    table.striped tbody td{border-bottom:1px solid var(--line)}
+    table.striped tbody td{border-bottom:1px solid #edf0f4; vertical-align:top}
     table.striped tfoot td{font-weight:700; border-top:2px solid #cfd6df;
-      border-bottom:none; padding:12px; background:#f1f4f8}
+      border-bottom:none; padding:13px 12px; background:#f1f4f8}
+    /* колонки таблицы товаров */
+    .goods td, .goods th{min-width:66px}
+    .goods td.nm-ru{min-width:230px; font-weight:500; color:var(--ink)}
+    .goods td.muted{min-width:200px}
+    .goods .mono{font-size:13px}
+
+    /* редактор таблицы товаров */
+    .ed-grid{border-collapse:collapse; font-size:12.5px}
+    .ed-grid th{background:#eef2f7; color:#525c6b; font-size:10.5px; text-transform:uppercase;
+      letter-spacing:.03em; padding:7px 6px; border:1px solid #d7dde6; white-space:nowrap}
+    .ed-grid td{padding:2px; border:1px solid #e6eaef}
+    .ed-grid input{width:100%; min-width:70px; padding:5px 6px; border:1px solid transparent;
+      border-radius:4px; font:inherit; font-size:12.5px; background:transparent}
+    .ed-grid input:focus{outline:none; border-color:var(--accent);
+      box-shadow:0 0 0 2px var(--accent-weak); background:#fff}
+    .ed-grid input.wide{min-width:200px}
+    .ed-grid .rowdel{color:var(--danger); cursor:pointer; text-align:center; font-weight:700; user-select:none}
+    .ed-hint{color:var(--muted); font-size:12.5px; margin:8px 0}
 
     /* данные инвойса в две колонки */
     .kv2{display:grid; grid-template-columns:repeat(2,1fr); gap:0 32px}
@@ -191,6 +209,7 @@
       refresh(); window.addEventListener('resize', refresh);
       el.addEventListener('mousedown', function(e){
         if(!scrollable()) return;
+        if(e.target.closest('input,select,textarea,button,a,.rowdel')) return; // не мешаем вводу
         down=true; moved=false; startX=e.pageX; startScroll=el.scrollLeft;
         el.style.cursor='grabbing';
       });
