@@ -145,41 +145,51 @@ def _parse_items(m_inv, m_rus, m_pack) -> list[dict]:
     c_price = col_of(m_inv, header_i, ["unitprice", "ценазашт", "цена"])
     c_total = col_of(m_inv, header_i, ["totalprice", "стоимость", "total"])
 
-    # карта веса/коробок из Packing list по артикулу
+    # карта веса/коробок из Packing list по артикулу (по заголовку столбцов)
     pack = {}
     if m_pack:
-        for row in m_pack:
-            cells = [_fmt(c) for c in row]
-            codes = [c for c in cells if re.fullmatch(r"[0-9A-Za-z]{5,}", c) and re.search(r"[A-Za-z]", c)]
-            # ищем артикул в строке и три последних числовых столбца
-            nums = [c for c in cells if re.fullmatch(r"-?\d+(\.\d+)?", c)]
-            if codes and len(nums) >= 3:
-                code = None
-                for c in cells:
-                    if re.fullmatch(r"\d?[A-Za-z]{1,3}\d{3,}", c) or re.search(r"[A-Za-z]\d{3,}", c):
-                        code = c
-                        break
-                if code:
-                    pack[code] = {"net_weight": nums[-3], "gross_weight": nums[-2], "box_count": nums[-1]}
+        ph = None
+        for i, row in enumerate(m_pack):
+            j = " ".join(_norm(c) for c in row)
+            has_code = ("itemcode" in j or "артикул" in j)
+            has_wb = any(k in j for k in ("netweight", "nettweight", "нетто", "grossweight", "брутто", "boxes", "короб"))
+            if has_code and has_wb:
+                ph = i
+                break
+        if ph is not None:
+            pc_item = col_of(m_pack, ph, ["itemcode", "артикул"])
+            pc_net = col_of(m_pack, ph, ["nettweight", "netweight", "неттовес", "нетто"])
+            pc_gross = col_of(m_pack, ph, ["grossweight", "бруттовес", "брутто"])
+            pc_box = col_of(m_pack, ph, ["boxes", "короб"])
+            for i in range(ph + 1, len(m_pack)):
+                code = _fmt(_cell(m_pack, i, pc_item)) if pc_item is not None else ""
+                if not code or _norm(code).startswith(("total", "итого", "grand")):
+                    continue
+                pack[code] = {
+                    "net_weight": _fmt(_cell(m_pack, i, pc_net)) if pc_net is not None else "",
+                    "gross_weight": _fmt(_cell(m_pack, i, pc_gross)) if pc_gross is not None else "",
+                    "box_count": _fmt(_cell(m_pack, i, pc_box)) if pc_box is not None else "",
+                }
 
-    # рус. названия по артикулу
+    # рус. названия по артикулу (по заголовку столбцов листа «Инвойс перевод»)
     rus = {}
     if m_rus:
-        for row in m_rus:
-            cells = row
-            code = None
-            name = ""
-            for j, c in enumerate(cells):
-                if c and re.search(r"[A-Za-z]\d{3,}", str(c)):
-                    code = str(c).strip()
-                    # наименование — следующая содержательная ячейка
-                    for jj in range(j + 1, len(cells)):
-                        if cells[jj] and len(str(cells[jj])) > 4:
-                            name = str(cells[jj])
-                            break
-                    break
-            if code and name:
-                rus[code] = _split_description(name)[0]
+        rh = None
+        for i, row in enumerate(m_rus):
+            j = " ".join(_norm(c) for c in row)
+            if ("артикул" in j or "itemcode" in j) and ("наименование" in j or "description" in j):
+                rh = i
+                break
+        if rh is not None:
+            rc_item = col_of(m_rus, rh, ["артикул", "itemcode"])
+            rc_name = col_of(m_rus, rh, ["наименование", "description"])
+            for i in range(rh + 1, len(m_rus)):
+                code = _fmt(_cell(m_rus, i, rc_item)) if rc_item is not None else ""
+                nm = _cell(m_rus, i, rc_name) if rc_name is not None else ""
+                if not code or _norm(code).startswith(("total", "итого", "grand")):
+                    continue
+                if nm:
+                    rus[code] = _split_description(nm)[0]
 
     items = []
     for i in range(header_i + 1, len(m_inv)):
@@ -195,11 +205,10 @@ def _parse_items(m_inv, m_rus, m_pack) -> list[dict]:
         if not hs or not item_code or \
            not re.fullmatch(r"\d+([.,]\d+)?", qty.replace(" ", "")):
             continue
-        name, barcode, origin = _split_description(desc)
-        if item_code in rus:
-            name = rus[item_code] or name
+        name_en, barcode, origin = _split_description(desc)
+        name = rus.get(item_code) or name_en  # рус. название, иначе англ.
         it = {
-            "hs_code": hs, "item_code": item_code, "name": name,
+            "hs_code": hs, "item_code": item_code, "name": name, "name_en": name_en,
             "barcode": barcode, "origin": origin, "qty": qty,
             "unit_price": _fmt(_cell(m_inv, i, c_price)) if c_price is not None else "",
             "total_price": _fmt(_cell(m_inv, i, c_total)) if c_total is not None else "",
@@ -217,17 +226,39 @@ def parse_invoice(path: str) -> dict:
         return {"fields": {}, "items": [], "warnings": ["openpyxl не установлен"]}
 
     wb = load_workbook(path, data_only=True)
+    mats = [_matrix(wb[n]) for n in wb.sheetnames]
 
-    def sheet(*names):
-        for n in wb.sheetnames:
-            nn = _norm(n)
-            if any(k in nn for k in names):
-                return _matrix(wb[n])
-        return None
+    def _header_text(m) -> str:
+        """Строка-заголовок товарной таблицы (код + кол-во), нормализованная."""
+        for row in m[:45]:
+            j = " ".join(_norm(c) for c in row)
+            code = any(k in j for k in ("custom", "тнвэд", "hscode", "itemcode", "артикул"))
+            qty = any(k in j for k in ("qty", "колво", "quantity"))
+            if code and qty:
+                return j
+        return ""
 
-    m_inv = sheet("facin", "invoice", "инвойс") or _matrix(wb[wb.sheetnames[0]])
-    m_pack = sheet("packing", "упаковочн")
-    m_rus = sheet("перевод", "rus")
+    # Определяем назначение листов ПО СОДЕРЖИМОМУ (имена бывают «Table 2/3/4»)
+    m_inv = m_pack = m_rus = None
+    for m in mats:
+        j = _header_text(m)
+        if not j:
+            continue
+        has_weight = any(k in j for k in ("netweight", "nettweight", "нетто",
+                                          "grossweight", "брутто", "boxes", "короб"))
+        is_eng = any(k in j for k in ("unitprice", "totalprice", "customcode",
+                                      "customscode", "itemcode"))
+        is_rus = any(k in j for k in ("наименование", "ценазашт", "стоимость",
+                                      "кодтнвэд", "артикул"))
+        if has_weight and m_pack is None:
+            m_pack = m
+        elif is_eng and not is_rus and m_inv is None:
+            m_inv = m
+        elif is_rus and m_rus is None:
+            m_rus = m
+    # фолбэки на случай нестандартной структуры
+    if m_inv is None:
+        m_inv = next((m for m in mats if _header_text(m) and m is not m_pack), mats[0])
 
     fields: dict = {}
     fields["number"] = _find_right(m_inv, ["nnvoice", "ninvoice", "invoiceno", "номеринвойса"])

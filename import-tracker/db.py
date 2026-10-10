@@ -117,7 +117,8 @@ def init_db() -> None:
             position    INTEGER,
             hs_code     TEXT,     -- Код ТН ВЭД
             item_code   TEXT,     -- Артикул
-            name        TEXT,     -- Наименование
+            name        TEXT,     -- Наименование (рус.)
+            name_en     TEXT,     -- Наименование (англ.)
             barcode     TEXT,
             origin      TEXT,
             qty         TEXT,
@@ -158,6 +159,9 @@ def init_db() -> None:
                 "inn", "packing_list_no", "source_file"):
         if col not in existing:
             conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} TEXT")
+    existing_items = {r["name"] for r in conn.execute("PRAGMA table_info(items)")}
+    if "name_en" not in existing_items:
+        conn.execute("ALTER TABLE items ADD COLUMN name_en TEXT")
     conn.commit()
     conn.close()
 
@@ -356,14 +360,15 @@ def replace_items(invoice_id: int, rows: list[dict]) -> None:
     conn.execute("DELETE FROM items WHERE invoice_id = ?", (invoice_id,))
     for pos, it in enumerate(rows):
         conn.execute(
-            """INSERT INTO items (invoice_id, position, hs_code, item_code, name,
+            """INSERT INTO items (invoice_id, position, hs_code, item_code, name, name_en,
                                   barcode, origin, qty, unit_price, total_price,
                                   net_weight, gross_weight, box_count)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (invoice_id, pos, it.get("hs_code", ""), it.get("item_code", ""),
-             it.get("name", ""), it.get("barcode", ""), it.get("origin", ""),
-             it.get("qty", ""), it.get("unit_price", ""), it.get("total_price", ""),
-             it.get("net_weight", ""), it.get("gross_weight", ""), it.get("box_count", "")),
+             it.get("name", ""), it.get("name_en", ""), it.get("barcode", ""),
+             it.get("origin", ""), it.get("qty", ""), it.get("unit_price", ""),
+             it.get("total_price", ""), it.get("net_weight", ""),
+             it.get("gross_weight", ""), it.get("box_count", "")),
         )
     conn.commit()
     conn.close()

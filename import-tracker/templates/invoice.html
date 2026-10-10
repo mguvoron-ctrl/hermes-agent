@@ -93,7 +93,8 @@
         <td class="mono muted">{{ it.hs_code }}</td>
         <td class="mono">{{ it.item_code }}</td>
         <td>{{ it.name }}
-          <div class="muted" style="font-size:11.5px">{% if it.barcode %}{{ it.barcode }}{% endif %}{% if it.origin %} · {{ it.origin }}{% endif %}</div>
+          {% if it.name_en and it.name_en != it.name %}<div class="muted" style="font-size:12px">{{ it.name_en }}</div>{% endif %}
+          <div class="muted" style="font-size:11px">{% if it.barcode %}{{ it.barcode }}{% endif %}{% if it.origin %} · {{ it.origin }}{% endif %}</div>
         </td>
         <td class="num">{{ it.qty }}</td>
         <td class="num">{{ it.unit_price }}</td>
