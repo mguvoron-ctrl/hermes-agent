@@ -253,6 +253,22 @@ def get_shipment(shipment_id: int):
 
 
 # --- Инвойсы ---------------------------------------------------------------
+def list_all_invoices():
+    """Все инвойсы по всем поставкам (для общего экрана)."""
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT i.*, s.number AS shipment_number, s.id AS shipment_id,
+               (SELECT COUNT(*) FROM files f WHERE f.invoice_id = i.id) AS file_count
+        FROM invoices i
+        JOIN shipments s ON s.id = i.shipment_id
+        ORDER BY s.created_at DESC, i.created_at
+        """
+    ).fetchall()
+    conn.close()
+    return rows
+
+
 def list_invoices(shipment_id: int):
     conn = get_conn()
     rows = conn.execute(

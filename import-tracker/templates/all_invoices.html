@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Все инвойсы{% endblock %}
+{% block content %}
+<h1>Все инвойсы</h1>
+<p class="sub">На каком этапе находится каждый инвойс. Нажми на строку, чтобы открыть.</p>
+
+<div class="card" style="padding:6px 8px">
+  {% if rows %}
+  <div class="scroll-x">
+  <table>
+    <thead>
+      <tr>
+        <th>Поставка</th><th>Инвойс</th><th>Поставщик</th>
+        <th class="num">Сумма</th><th>Текущий этап</th><th>Прогресс</th><th class="num">Файлов</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      {% set p = r.progress %}
+      {% set done = (p.current == "Закрыто") %}
+      <tr class="clickable" onclick="location.href='/invoices/{{ r.inv.id }}'">
+        <td class="muted">{{ r.inv.shipment_number }}</td>
+        <td><b>{{ r.inv.number }}</b></td>
+        <td>{{ r.inv.supplier or "—" }}</td>
+        <td class="num">{{ r.inv.amount or "—" }} <span class="muted">{{ r.inv.currency or "" }}</span></td>
+        <td>
+          {% if done %}
+            <span class="badge ok">✓ Закрыто</span>
+          {% else %}
+            <span class="badge accent">{{ p.current }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="dots">
+            {% for i in range(p.total) %}
+              {% if i < p.done %}<i class="done"></i>
+              {% elif i == p.done and not done %}<i class="now"></i>
+              {% else %}<i></i>{% endif %}
+            {% endfor %}
+          </span>
+          <span class="steptxt">{{ p.done }}/{{ p.total }}</span>
+        </td>
+        <td class="num">{{ r.inv.file_count }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Пока нет ни одного инвойса. Создай поставку и загрузи инвойс из Excel.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -2,6 +2,8 @@
 {% block title %}Пользователи{% endblock %}
 {% block content %}
 <h1>Пользователи</h1>
+<p class="sub">Заведи логины для коллег. Роль «Администратор» даёт доступ к этому разделу.</p>
+
 <div class="card">
   <h2>Добавить коллегу</h2>
   {% if error %}<div class="err">{{ error }}</div>{% endif %}
@@ -9,7 +11,7 @@
     <div class="row">
       <div><label class="lbl">Логин</label><input type="text" name="username" required></div>
       <div><label class="lbl">Пароль</label><input type="text" name="password" required></div>
-      <div style="flex:0 0 160px">
+      <div style="flex:0 0 170px">
         <label class="lbl">Роль</label>
         <select name="role">
           <option value="user">Сотрудник</option>
@@ -21,12 +23,16 @@
     <button class="btn" type="submit">Создать</button>
   </form>
 </div>
+
 <div class="card">
+  <h2>Список пользователей</h2>
   <table>
-    <tr><th>Логин</th><th>Роль</th><th>Создан</th></tr>
+    <thead><tr><th>Логин</th><th>Роль</th><th>Создан</th></tr></thead>
+    <tbody>
     {% for u in users %}
-    <tr><td><b>{{ u.username }}</b></td><td>{{ u.role }}</td><td class="muted">{{ u.created_at }}</td></tr>
+      <tr><td><b>{{ u.username }}</b></td><td>{{ u.role }}</td><td class="muted">{{ u.created_at }}</td></tr>
     {% endfor %}
+    </tbody>
   </table>
 </div>
 {% endblock %}

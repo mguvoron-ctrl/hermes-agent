@@ -5,69 +5,123 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Трекер поставок{% endblock %}</title>
   <style>
-    :root {
-      --bg: #f4f5f7; --card: #fff; --ink: #1c2430; --muted: #6b7684;
-      --line: #e3e6ea; --accent: #2f6feb; --ok: #1a9c56; --work: #d9880a; --wait: #8a94a0;
+    :root{
+      --bg:#f5f6f8; --card:#ffffff; --ink:#1b2430; --muted:#707b8a;
+      --line:#e8ebef; --line2:#f0f2f5;
+      --accent:#4263eb; --accent-weak:#eaefff;
+      --ok:#15924f; --ok-bg:#e4f6ec;
+      --work:#c67806; --work-bg:#fcf1dd;
+      --wait:#8a94a2; --wait-bg:#eef1f4;
+      --danger:#e24a4a;
+      --shadow:0 1px 2px rgba(20,30,50,.04),0 2px 8px rgba(20,30,50,.05);
     }
-    * { box-sizing: border-box; }
-    body { margin:0; font: 15px/1.5 -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-           background: var(--bg); color: var(--ink); }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    header { background: var(--ink); color:#fff; padding: 12px 20px; display:flex;
-             align-items:center; gap:18px; }
-    header .brand { font-weight:700; font-size:17px; }
-    header a { color:#cdd6e4; }
-    header .spacer { flex:1; }
-    .wrap { max-width: 1000px; margin: 22px auto; padding: 0 16px; }
-    .card { background: var(--card); border:1px solid var(--line); border-radius:10px;
-            padding:18px; margin-bottom:16px; }
-    h1 { font-size:22px; margin:0 0 14px; }
-    h2 { font-size:17px; margin:0 0 10px; }
-    table { width:100%; border-collapse: collapse; }
-    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align: top; }
-    th { color: var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.03em; }
-    input[type=text], input[type=password], textarea, select {
-      width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
-      font: inherit; background:#fff; }
-    textarea { min-height:52px; resize:vertical; }
-    .btn { display:inline-block; background:var(--accent); color:#fff; border:none;
-           padding:9px 15px; border-radius:7px; font:inherit; cursor:pointer; }
-    .btn:hover { filter:brightness(1.05); }
-    .btn.sm { padding:5px 10px; font-size:13px; }
-    .btn.ghost { background:#eef1f5; color:var(--ink); }
-    .btn.danger { background:#e5484d; }
-    .row { display:flex; gap:12px; flex-wrap:wrap; }
-    .row > * { flex:1; min-width:160px; }
-    .muted { color: var(--muted); }
-    .pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:13px; font-weight:600; }
-    .pill.ok   { background:#e2f5ea; color:var(--ok); }
-    .pill.work { background:#fdf0da; color:var(--work); }
-    .pill.wait { background:#eef1f5; color:var(--wait); }
-    .stage-now { background:#eaf1ff; color:var(--accent); border:1px solid #cfe0ff;
-                 padding:6px 12px; border-radius:8px; font-weight:700; display:inline-block; }
-    .step { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--line); }
-    .step.current { background:#f3f8ff; border-radius:8px; padding:12px; margin:0 -12px; border-bottom:none; }
-    .step .dot { width:26px; height:26px; border-radius:50%; flex:0 0 26px; text-align:center;
-                 line-height:26px; font-size:14px; }
-    .dot.ok   { background:var(--ok); color:#fff; }
-    .dot.work { background:var(--work); color:#fff; }
-    .dot.wait { background:#dfe3e8; color:#8a94a0; }
-    .kind { font-size:12px; color:var(--muted); }
-    .err { background:#fdecee; color:#c0393e; padding:10px 12px; border-radius:7px; margin-bottom:12px; }
-    .file-item { font-size:13px; }
-    label.lbl { font-size:13px; color:var(--muted); display:block; margin-bottom:4px; }
+    *{box-sizing:border-box}
+    html,body{margin:0}
+    body{
+      font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
+    }
+    a{color:var(--accent); text-decoration:none}
+    a:hover{text-decoration:underline}
+
+    header.topbar{
+      background:#141c2b; color:#eef1f6; padding:0 20px; height:52px;
+      display:flex; align-items:center; gap:4px; position:sticky; top:0; z-index:10;
+    }
+    .topbar .brand{font-weight:700; font-size:16px; margin-right:18px; color:#fff}
+    .topbar nav a{
+      color:#c4ccd8; padding:8px 12px; border-radius:8px; font-size:14px; font-weight:500;
+    }
+    .topbar nav a:hover{background:#1f293b; color:#fff; text-decoration:none}
+    .topbar nav a.active{background:#2a3650; color:#fff}
+    .topbar .spacer{flex:1}
+    .topbar .who{color:#8995a6; font-size:13px; margin-right:12px}
+
+    .wrap{max-width:1080px; margin:24px auto; padding:0 16px}
+    .card{
+      background:var(--card); border:1px solid var(--line); border-radius:12px;
+      padding:20px; margin-bottom:16px; box-shadow:var(--shadow);
+    }
+    h1{font-size:23px; font-weight:700; margin:0 0 4px; letter-spacing:-.01em}
+    h2{font-size:16px; font-weight:650; margin:0 0 14px; letter-spacing:-.01em}
+    .sub{color:var(--muted); margin:0 0 18px}
+    .crumbs{color:var(--muted); font-size:13px; margin:0 0 12px}
+    .crumbs a{color:var(--muted)} .crumbs a:hover{color:var(--accent)}
+
+    /* таблицы */
+    table{width:100%; border-collapse:collapse; font-size:14px}
+    thead th{
+      text-align:left; color:var(--muted); font-weight:600; font-size:11.5px;
+      text-transform:uppercase; letter-spacing:.04em; padding:8px 12px;
+      border-bottom:1px solid var(--line); white-space:nowrap;
+    }
+    tbody td{padding:11px 12px; border-bottom:1px solid var(--line2); vertical-align:middle}
+    tbody tr:last-child td{border-bottom:none}
+    tr.clickable{cursor:pointer}
+    tr.clickable:hover{background:#fafbfe}
+    .num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+    .mono{font-variant-numeric:tabular-nums}
+
+    /* бейдж этапа */
+    .badge{display:inline-block; padding:4px 11px; border-radius:999px; font-size:12.5px;
+           font-weight:600; white-space:nowrap; line-height:1.3}
+    .badge.ok{background:var(--ok-bg); color:var(--ok)}
+    .badge.work{background:var(--work-bg); color:var(--work)}
+    .badge.wait{background:var(--wait-bg); color:var(--wait)}
+    .badge.accent{background:var(--accent-weak); color:var(--accent)}
+
+    /* точки-этапы */
+    .dots{display:inline-flex; gap:3px; align-items:center}
+    .dots i{width:7px; height:7px; border-radius:50%; background:#dfe3e9; display:inline-block}
+    .dots i.done{background:var(--ok)}
+    .dots i.now{background:var(--accent); box-shadow:0 0 0 2px var(--accent-weak)}
+    .steptxt{color:var(--muted); font-size:12.5px; margin-left:8px}
+
+    /* формы */
+    label.lbl{font-size:12.5px; color:var(--muted); display:block; margin-bottom:5px; font-weight:500}
+    input[type=text],input[type=password],textarea,select{
+      width:100%; padding:9px 11px; border:1px solid #d9dee5; border-radius:9px;
+      font:inherit; background:#fff; color:var(--ink); transition:border .12s,box-shadow .12s;
+    }
+    input:focus,textarea:focus,select:focus{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-weak);
+    }
+    textarea{min-height:46px; resize:vertical}
+    .btn{display:inline-block; background:var(--accent); color:#fff; border:none;
+         padding:9px 16px; border-radius:9px; font:inherit; font-weight:600; cursor:pointer;
+         transition:filter .12s}
+    .btn:hover{filter:brightness(1.07)}
+    .btn.sm{padding:6px 11px; font-size:13px; font-weight:500}
+    .btn.ghost{background:#eef1f5; color:var(--ink)}
+    .btn.danger{background:var(--danger)}
+    .row{display:flex; gap:12px; flex-wrap:wrap}
+    .row>*{flex:1; min-width:150px}
+    .muted{color:var(--muted)}
+    .err{background:#fdecee; color:#c0393e; padding:10px 12px; border-radius:9px; margin-bottom:12px}
+    .empty{color:var(--muted); padding:8px 2px}
+
+    /* сетка "ключ-значение" */
+    .kv{display:grid; grid-template-columns:210px 1fr}
+    .kv>div{padding:10px 2px; border-bottom:1px solid var(--line2); display:flex}
+    .kv>div:nth-last-child(-n+2){border-bottom:none}
+    .kv .k{color:var(--muted)}
+    @media(max-width:560px){ .kv{grid-template-columns:1fr} .kv .k{padding-bottom:0} }
+
+    .scroll-x{overflow-x:auto; margin:0 -4px}
   </style>
 </head>
 <body>
   {% if user %}
-  <header>
+  <header class="topbar">
     <span class="brand">📦 Трекер поставок</span>
-    <a href="/">Поставки</a>
-    {% if user.role == 'admin' %}<a href="/users">Пользователи</a>{% endif %}
+    <nav>
+      <a href="/" class="{{ 'active' if nav=='shipments' else '' }}">Поставки</a>
+      <a href="/invoices" class="{{ 'active' if nav=='invoices' else '' }}">Все инвойсы</a>
+      {% if user.role == 'admin' %}<a href="/users" class="{{ 'active' if nav=='users' else '' }}">Пользователи</a>{% endif %}
+    </nav>
     <span class="spacer"></span>
-    <span class="muted">{{ user.name }}</span>
-    <a href="/logout">Выйти</a>
+    <span class="who">{{ user.name }}</span>
+    <a href="/logout" style="color:#c4ccd8; font-size:14px; padding:8px 10px">Выйти</a>
   </header>
   {% endif %}
   <div class="wrap">

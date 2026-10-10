@@ -1,66 +1,83 @@
 {% extends "base.html" %}
 {% block title %}Инвойс {{ invoice.number }}{% endblock %}
 {% block content %}
-<p class="muted">
+<p class="crumbs">
   <a href="/">Поставки</a> ·
-  <a href="/shipments/{{ shipment.id }}">Поставка {{ shipment.number }}</a> · Инвойс
+  <a href="/shipments/{{ shipment.id }}">Поставка {{ shipment.number }}</a> ·
+  Инвойс {{ invoice.number }}
 </p>
 <h1>Инвойс {{ invoice.number }}</h1>
-<p class="muted">
-  {% if invoice.supplier %}Поставщик: {{ invoice.supplier }}{% endif %}
-  {% if invoice.amount %} · Сумма: {{ invoice.amount }}{% endif %}
+<p class="sub">
+  {% if invoice.supplier %}{{ invoice.supplier }}{% endif %}
+  {% if invoice.amount %} · {{ invoice.amount }} {{ invoice.currency or "" }}{% endif %}
 </p>
 
+{% set done_all = (progress.current == "Закрыто") %}
 <div class="card">
-  {% if progress.current == "Закрыто" %}
-    <h2>Статус: <span class="pill ok">✓ Все этапы пройдены</span></h2>
+  {% if done_all %}
+    <h2 style="margin:0">Статус: <span class="badge ok">✓ Все этапы пройдены</span></h2>
   {% else %}
-    <h2 style="margin-bottom:6px">Сейчас на этапе:</h2>
-    <div class="stage-now" style="font-size:16px">{{ progress.current }}</div>
-    <span class="muted"> — шаг {{ progress.done + 1 }} из {{ progress.total }}</span>
+    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap">
+      <div>
+        <div class="muted" style="font-size:12.5px; margin-bottom:4px">СЕЙЧАС НА ЭТАПЕ</div>
+        <span class="badge accent" style="font-size:14px">{{ progress.current }}</span>
+      </div>
+      <div style="flex:1; min-width:160px">
+        <span class="dots">
+          {% for i in range(progress.total) %}{% if i < progress.done %}<i class="done"></i>{% elif i == progress.done %}<i class="now"></i>{% else %}<i></i>{% endif %}{% endfor %}
+        </span>
+        <span class="steptxt">шаг {{ progress.done + 1 }} из {{ progress.total }}</span>
+      </div>
+    </div>
   {% endif %}
 </div>
 
 <div class="card">
   <h2>Данные инвойса</h2>
-  <table>
-    <tr><td class="muted" style="width:220px">Поставщик</td><td>{{ invoice.supplier or "—" }}</td></tr>
-    <tr><td class="muted">Дата инвойса</td><td>{{ invoice.inv_date or "—" }}</td></tr>
-    <tr><td class="muted">Условия поставки</td><td>{{ invoice.incoterms or "—" }}</td></tr>
-    <tr><td class="muted">Валюта</td><td>{{ invoice.currency or "—" }}</td></tr>
-    <tr><td class="muted">Сумма к оплате</td><td><b>{{ invoice.amount or "—" }}</b> {{ invoice.currency or "" }}</td></tr>
-    <tr><td class="muted">Контракт</td><td>{{ invoice.contract or "—" }}</td></tr>
-    <tr><td class="muted">Получатель</td><td>{{ invoice.consignee or "—" }}{% if invoice.inn %} (ИНН {{ invoice.inn }}){% endif %}</td></tr>
-    <tr><td class="muted">№ упаковочного листа</td><td>{{ invoice.packing_list_no or "—" }}</td></tr>
-    <tr><td class="muted">Паллеты / коробки</td><td>{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</td></tr>
-    <tr><td class="muted">Вес нетто / брутто, кг</td><td>{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }}</td></tr>
-    {% if invoice.source_file %}<tr><td class="muted">Файл-источник</td><td>{{ invoice.source_file }}</td></tr>{% endif %}
-  </table>
+  <div class="kv">
+    <div><span class="k">Поставщик</span></div><div>{{ invoice.supplier or "—" }}</div>
+    <div><span class="k">Дата инвойса</span></div><div>{{ invoice.inv_date or "—" }}</div>
+    <div><span class="k">Условия поставки</span></div><div>{{ invoice.incoterms or "—" }}</div>
+    <div><span class="k">Валюта</span></div><div>{{ invoice.currency or "—" }}</div>
+    <div><span class="k">Сумма к оплате</span></div><div><b>{{ invoice.amount or "—" }}</b> {{ invoice.currency or "" }}</div>
+    <div><span class="k">Контракт</span></div><div>{{ invoice.contract or "—" }}</div>
+    <div><span class="k">Получатель</span></div><div>{{ invoice.consignee or "—" }}{% if invoice.inn %} <span class="muted">(ИНН {{ invoice.inn }})</span>{% endif %}</div>
+    <div><span class="k">№ упаковочного листа</span></div><div>{{ invoice.packing_list_no or "—" }}</div>
+    <div><span class="k">Паллеты / коробки</span></div><div>{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</div>
+    <div><span class="k">Вес нетто / брутто, кг</span></div><div>{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }}</div>
+    {% if invoice.source_file %}<div><span class="k">Файл-источник</span></div><div class="muted">{{ invoice.source_file }}</div>{% endif %}
+  </div>
 </div>
 
 {% if items %}
 <div class="card">
-  <h2>Товары ({{ items|length }})</h2>
-  <div style="overflow-x:auto">
+  <h2>Товары <span class="muted" style="font-weight:500">({{ items|length }})</span></h2>
+  <div class="scroll-x">
   <table>
-    <tr>
-      <th>ТН ВЭД</th><th>Артикул</th><th>Наименование</th><th>Штрихкод</th>
-      <th>Кол-во</th><th>Цена</th><th>Сумма</th><th>Нетто</th><th>Брутто</th><th>Кор.</th>
-    </tr>
+    <thead>
+      <tr>
+        <th>ТН ВЭД</th><th>Артикул</th><th>Наименование</th>
+        <th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th>
+        <th class="num">Нетто</th><th class="num">Брутто</th><th class="num">Кор.</th>
+      </tr>
+    </thead>
+    <tbody>
     {% for it in items %}
-    <tr>
-      <td>{{ it.hs_code }}</td>
-      <td>{{ it.item_code }}</td>
-      <td>{{ it.name }}{% if it.origin %}<br><span class="muted" style="font-size:12px">{{ it.origin }}</span>{% endif %}</td>
-      <td class="muted" style="font-size:12px">{{ it.barcode }}</td>
-      <td>{{ it.qty }}</td>
-      <td>{{ it.unit_price }}</td>
-      <td>{{ it.total_price }}</td>
-      <td>{{ it.net_weight }}</td>
-      <td>{{ it.gross_weight }}</td>
-      <td>{{ it.box_count }}</td>
-    </tr>
+      <tr>
+        <td class="mono muted">{{ it.hs_code }}</td>
+        <td class="mono">{{ it.item_code }}</td>
+        <td>{{ it.name }}
+          <div class="muted" style="font-size:11.5px">{% if it.barcode %}{{ it.barcode }}{% endif %}{% if it.origin %} · {{ it.origin }}{% endif %}</div>
+        </td>
+        <td class="num">{{ it.qty }}</td>
+        <td class="num">{{ it.unit_price }}</td>
+        <td class="num">{{ it.total_price }}</td>
+        <td class="num">{{ it.net_weight }}</td>
+        <td class="num">{{ it.gross_weight }}</td>
+        <td class="num">{{ it.box_count }}</td>
+      </tr>
     {% endfor %}
+    </tbody>
   </table>
   </div>
 </div>
@@ -71,76 +88,72 @@
   {% for s in steps %}
   {% set st = s.status %}
   {% set cls = 'ok' if st == 'готово' else ('work' if st == 'в работе' else 'wait') %}
-  {% set mark = '✓' if st == 'готово' else ('…' if st == 'в работе' else '') %}
   {% set is_current = (progress.current == s.name) %}
-  <div class="step {{ 'current' if is_current else '' }}">
-    <div class="dot {{ cls }}">{{ mark }}</div>
-    <div style="flex:1">
-      <div><b>{{ s.position + 1 }}. {{ s.name }}</b> <span class="kind">· {{ s.kind }}</span></div>
-
-      <form method="post" action="/invoices/{{ invoice.id }}/steps/{{ s.id }}"
-            style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start">
-        <select name="status" style="flex:0 0 150px">
-          {% for opt in statuses %}
-          <option value="{{ opt }}" {{ 'selected' if opt == st else '' }}>{{ opt }}</option>
-          {% endfor %}
-        </select>
-        <input type="text" name="note" placeholder="заметка (кому отправил, дата…)"
-               value="{{ s.note or '' }}" style="flex:1; min-width:180px">
-        <button class="btn sm" type="submit">Сохранить</button>
-      </form>
-
-      {# Файлы этого шага #}
-      {% set sfiles = files_by_step.get(s.id, []) %}
-      {% if sfiles %}
-      <div style="margin-top:8px">
-        {% for f in sfiles %}
-        <div class="file-item">
-          📄 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>
-          <span class="muted">· {{ f.uploaded_at }}</span>
-          <form method="post" action="/files/{{ f.id }}/delete" style="display:inline">
-            <input type="hidden" name="invoice_id" value="{{ invoice.id }}">
-            <button class="btn sm danger" type="submit"
-                    onclick="return confirm('Удалить файл?')">✕</button>
-          </form>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      <form method="post" action="/invoices/{{ invoice.id }}/files"
-            enctype="multipart/form-data" style="margin-top:6px; display:flex; gap:8px; align-items:center">
-        <input type="hidden" name="step_id" value="{{ s.id }}">
-        <input type="file" name="f" required>
-        <button class="btn sm ghost" type="submit">Прикрепить к шагу</button>
-      </form>
+  <div style="padding:13px 0; border-bottom:1px solid var(--line2); {% if is_current %}background:#f6f9ff; margin:0 -20px; padding-left:20px; padding-right:20px; border-bottom:none{% endif %}">
+    <div style="display:flex; align-items:center; gap:10px">
+      <span class="badge {{ cls }}">{{ '✓' if st=='готово' else ('●' if st=='в работе' else '○') }}</span>
+      <b>{{ s.position + 1 }}. {{ s.name }}</b>
+      <span class="muted" style="font-size:12px">· {{ s.kind }}</span>
     </div>
+
+    <form method="post" action="/invoices/{{ invoice.id }}/steps/{{ s.id }}"
+          style="margin-top:9px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+      <select name="status" style="flex:0 0 150px">
+        {% for opt in statuses %}<option value="{{ opt }}" {{ 'selected' if opt==st else '' }}>{{ opt }}</option>{% endfor %}
+      </select>
+      <input type="text" name="note" placeholder="заметка (кому отправил, дата…)"
+             value="{{ s.note or '' }}" style="flex:1; min-width:180px">
+      <button class="btn sm" type="submit">Сохранить</button>
+    </form>
+
+    {% set sfiles = files_by_step.get(s.id, []) %}
+    {% if sfiles %}
+    <div style="margin-top:9px; display:flex; flex-direction:column; gap:4px">
+      {% for f in sfiles %}
+      <div style="font-size:13px">
+        📄 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>
+        <span class="muted">· {{ f.uploaded_at }}</span>
+        <form method="post" action="/files/{{ f.id }}/delete" style="display:inline">
+          <input type="hidden" name="invoice_id" value="{{ invoice.id }}">
+          <button class="btn sm danger" type="submit" onclick="return confirm('Удалить файл?')" style="padding:2px 8px">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/invoices/{{ invoice.id }}/files" enctype="multipart/form-data"
+          style="margin-top:7px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+      <input type="hidden" name="step_id" value="{{ s.id }}">
+      <input type="file" name="f" required style="flex:1; min-width:180px">
+      <button class="btn sm ghost" type="submit">Прикрепить к шагу</button>
+    </form>
   </div>
   {% endfor %}
 </div>
 
 <div class="card">
   <h2>Общая папка документов инвойса</h2>
-  <p class="muted">Файлы без привязки к конкретному шагу.</p>
-  <form method="post" action="/invoices/{{ invoice.id }}/files"
-        enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center; margin-bottom:10px">
-    <input type="file" name="f" required>
+  <p class="muted" style="margin-top:-8px">Файлы, не привязанные к конкретному этапу.</p>
+  <form method="post" action="/invoices/{{ invoice.id }}/files" enctype="multipart/form-data"
+        style="display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap">
+    <input type="file" name="f" required style="flex:1; min-width:180px">
     <button class="btn sm" type="submit">Загрузить</button>
   </form>
   {% set loose = files_by_step.get(None, []) %}
   {% if loose %}
     {% for f in loose %}
-    <div class="file-item" style="padding:4px 0">
+    <div style="font-size:13px; padding:4px 0">
       📄 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>
-      <span class="muted">· загрузил {{ f.uploaded_by }} · {{ f.uploaded_at }}</span>
+      <span class="muted">· {{ f.uploaded_by }} · {{ f.uploaded_at }}</span>
       <form method="post" action="/files/{{ f.id }}/delete" style="display:inline">
         <input type="hidden" name="invoice_id" value="{{ invoice.id }}">
-        <button class="btn sm danger" type="submit" onclick="return confirm('Удалить файл?')">✕</button>
+        <button class="btn sm danger" type="submit" onclick="return confirm('Удалить файл?')" style="padding:2px 8px">✕</button>
       </form>
     </div>
     {% endfor %}
   {% else %}
-    <p class="muted">Пока нет файлов без привязки к шагу.</p>
+    <p class="empty">Пока нет файлов без привязки к шагу.</p>
   {% endif %}
 </div>
 {% endblock %}

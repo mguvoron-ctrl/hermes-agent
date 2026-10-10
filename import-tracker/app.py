@@ -102,7 +102,18 @@ def logout(request: Request):
 def index(request: Request, user=Depends(require_user)):
     shipments = db.list_shipments()
     return templates.TemplateResponse(
-        request, "shipments.html", {"user": user, "shipments": shipments}
+        request, "shipments.html", {"user": user, "shipments": shipments, "nav": "shipments"}
+    )
+
+
+@app.get("/invoices", response_class=HTMLResponse)
+def all_invoices(request: Request, user=Depends(require_user)):
+    """Общий экран: все инвойсы и на каком этапе каждый."""
+    rows = []
+    for inv in db.list_all_invoices():
+        rows.append({"inv": inv, "progress": db.progress(inv["id"])})
+    return templates.TemplateResponse(
+        request, "all_invoices.html", {"user": user, "rows": rows, "nav": "invoices"}
     )
 
 
@@ -126,7 +137,7 @@ def shipment_detail(request: Request, shipment_id: int, user=Depends(require_use
     rows = [{"inv": inv, "progress": db.progress(inv["id"])} for inv in invoices]
     return templates.TemplateResponse(
         request, "shipment.html",
-        {"user": user, "shipment": shipment, "rows": rows},
+        {"user": user, "shipment": shipment, "rows": rows, "nav": "shipments"},
     )
 
 
@@ -228,7 +239,7 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
             "user": user, "invoice": invoice,
             "shipment": shipment, "steps": steps, "files": files,
             "files_by_step": files_by_step, "progress": db.progress(invoice_id),
-            "statuses": db.STATUSES, "items": items,
+            "statuses": db.STATUSES, "items": items, "nav": "invoices",
         },
     )
 
@@ -285,7 +296,7 @@ def users_page(request: Request, user=Depends(require_user)):
     if user["role"] != "admin":
         raise HTTPException(403, "Только для администратора")
     return templates.TemplateResponse(
-        request, "users.html", {"user": user, "users": db.list_users(), "error": None}
+        request, "users.html", {"user": user, "users": db.list_users(), "error": None, "nav": "users"}
     )
 
 
@@ -300,7 +311,7 @@ def add_user(request: Request, username: str = Form(...), password: str = Form(.
     except Exception:
         error = "Такой логин уже существует"
     return templates.TemplateResponse(
-        request, "users.html", {"user": user, "users": db.list_users(), "error": error}
+        request, "users.html", {"user": user, "users": db.list_users(), "error": error, "nav": "users"}
     )
 
 

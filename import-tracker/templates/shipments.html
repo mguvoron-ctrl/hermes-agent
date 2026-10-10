@@ -2,12 +2,13 @@
 {% block title %}Поставки{% endblock %}
 {% block content %}
 <h1>Поставки</h1>
+<p class="sub">Каждая поставка содержит один или несколько инвойсов.</p>
 
 <div class="card">
   <h2>Новая поставка</h2>
   <form method="post" action="/shipments">
     <div class="row">
-      <div style="flex:0 0 200px">
+      <div style="flex:0 0 220px">
         <label class="lbl">Номер поставки *</label>
         <input type="text" name="number" required>
       </div>
@@ -22,20 +23,27 @@
 </div>
 
 <div class="card">
+  <h2>Список поставок</h2>
   {% if shipments %}
+  <div class="scroll-x">
   <table>
-    <tr><th>Номер поставки</th><th>Название</th><th>Инвойсов</th><th>Создана</th></tr>
+    <thead>
+      <tr><th>Номер поставки</th><th>Название</th><th class="num">Инвойсов</th><th>Создана</th></tr>
+    </thead>
+    <tbody>
     {% for s in shipments %}
-    <tr>
-      <td><a href="/shipments/{{ s.id }}"><b>{{ s.number }}</b></a></td>
-      <td>{{ s.title or "—" }}</td>
-      <td>{{ s.invoice_count }}</td>
-      <td class="muted">{{ s.created_at }}</td>
-    </tr>
+      <tr class="clickable" onclick="location.href='/shipments/{{ s.id }}'">
+        <td><b>{{ s.number }}</b></td>
+        <td>{{ s.title or "—" }}</td>
+        <td class="num">{{ s.invoice_count }}</td>
+        <td class="muted">{{ s.created_at }}</td>
+      </tr>
     {% endfor %}
+    </tbody>
   </table>
+  </div>
   {% else %}
-  <p class="muted">Пока нет ни одной поставки. Создай первую выше ↑</p>
+  <p class="empty">Пока нет ни одной поставки. Создай первую выше ↑</p>
   {% endif %}
 </div>
 {% endblock %}
