@@ -220,6 +220,111 @@ def _parse_items(m_inv, m_rus, m_pack) -> list[dict]:
     return items
 
 
+def _is_camion(mats) -> bool:
+    """Это готовый реестр Камьён (а не инвойс поставщика)?"""
+    for m in mats:
+        for row in m[:30]:
+            j = " ".join(_norm(c) for c in row)
+            if "customcode" in j and any(k in j for k in
+                                         ("cip", "колвосост", "producteur", "designationrus")):
+                return True
+    return False
+
+
+def parse_camion(mats) -> dict:
+    """Разбор готового/переделанного файла Камьён (реестр из 15 колонок)."""
+    # найти лист и строку заголовка
+    m = None
+    hdr = None
+    for cand in mats:
+        for i, row in enumerate(cand[:30]):
+            j = " ".join(_norm(c) for c in row)
+            if "customcode" in j and ("cip" in j or "designationrus" in j or "qty" in j):
+                m, hdr = cand, i
+                break
+        if m is not None:
+            break
+    if m is None:
+        return {"fields": {}, "items": [], "warnings": ["Не найден заголовок Камьёна"]}
+
+    header = m[hdr]
+
+    def col(*keys, exact=None):
+        for j, c in enumerate(header):
+            n = _norm(c)
+            if exact is not None:
+                if n == exact:
+                    return j
+            elif n and any(k in n for k in keys):
+                return j
+        return None
+
+    c_hs = col("customcode")
+    c_item = col("itemcode")
+    c_desig = col(exact="designation")
+    c_rus = col("designationrus", "рус")
+    c_qty = col("qty", "колво")
+    c_cip = col("cip", "ценазашт")
+    c_total = col("nettotal", "стоимость")
+    c_net = col("netweight", "неттовес")
+    c_brut = col("brut", "бруттовес")
+    c_box = col("boxes", "короб")
+    c_inv = col("invoice", "инвойс")
+    c_orig = col("origine", "origin", "страна")
+    c_ean = col("ean", "штрих")
+
+    # метаданные
+    fields = {}
+    fields["supplier"] = _find_right(m, ["отправитель", "exporter", "supplier"])
+    cno = _find_right(m, ["контракт", "contract"])
+    cdt = _find_right(m, ["датаконтракта", "датаконтр"])
+    if cno:
+        fields["contract"] = "№ " + cno + (" from " + cdt if cdt else "")
+
+    items = []
+    inv_no = ""
+    for i in range(hdr + 1, len(m)):
+        hs = _fmt(_cell(m, i, c_hs)) if c_hs is not None else ""
+        item = _fmt(_cell(m, i, c_item)) if c_item is not None else ""
+        if not item and not hs:
+            continue
+        if _norm(item).startswith(("total", "итого", "grand")):
+            break
+        if not inv_no and c_inv is not None:
+            inv_no = _fmt(_cell(m, i, c_inv))
+        items.append({
+            "hs_code": hs,
+            "item_code": item,
+            "name": _fmt(_cell(m, i, c_rus)) if c_rus is not None else "",
+            "name_en": _fmt(_cell(m, i, c_desig)) if c_desig is not None else "",
+            "barcode": re.sub(r"\D", "", _fmt(_cell(m, i, c_ean))) if c_ean is not None else "",
+            "origin": _fmt(_cell(m, i, c_orig)) if c_orig is not None else "",
+            "qty": _fmt(_cell(m, i, c_qty)) if c_qty is not None else "",
+            "unit_price": _fmt(_cell(m, i, c_cip)) if c_cip is not None else "",
+            "total_price": _fmt(_cell(m, i, c_total)) if c_total is not None else "",
+            "net_weight": _fmt(_cell(m, i, c_net)) if c_net is not None else "",
+            "gross_weight": _fmt(_cell(m, i, c_brut)) if c_brut is not None else "",
+            "box_count": _fmt(_cell(m, i, c_box)) if c_box is not None else "",
+        })
+    if inv_no:
+        fields["number"] = inv_no
+    fields = {k: v for k, v in fields.items() if v}
+    return {"fields": fields, "items": items, "warnings": [], "format": "camion"}
+
+
+def parse_any(path: str) -> dict:
+    """Определяет формат файла (инвойс поставщика или готовый Камьён) и разбирает."""
+    if load_workbook is None:
+        return {"fields": {}, "items": [], "warnings": ["openpyxl не установлен"], "format": "invoice"}
+    wb = load_workbook(path, data_only=True)
+    mats = [_matrix(wb[n]) for n in wb.sheetnames]
+    if _is_camion(mats):
+        return parse_camion(mats)
+    r = parse_invoice(path)
+    r["format"] = "invoice"
+    return r
+
+
 def parse_invoice(path: str) -> dict:
     """Главная функция. Возвращает {'fields': {...}, 'items': [...], 'warnings': [...]}."""
     if load_workbook is None:

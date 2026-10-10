@@ -175,12 +175,13 @@ def _save_original(invoice_id: int, shipment, invoice, filename: str,
 
 
 def _parse_xlsx(data: bytes) -> dict:
-    """Разбор Excel из байтов (openpyxl читает с диска → временный файл)."""
+    """Разбор Excel из байтов: сам определяет формат (инвойс поставщика
+    или готовый/переделанный Камьён)."""
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
         tmp.write(data)
         tmp_path = tmp.name
     try:
-        return xlsx_import.parse_invoice(tmp_path)
+        return xlsx_import.parse_any(tmp_path)
     finally:
         try:
             os.remove(tmp_path)
@@ -205,6 +206,11 @@ def _apply_parsed(invoice_id: int, shipment, invoice, parsed: dict,
     for s in steps:
         if s["kind"] == "входящий" and s["position"] <= 2:
             db.update_step(s["id"], "готово", "получено из Excel-файла")
+    # Если загрузили готовый Камьён — отмечаем и этап «Камьён»
+    if parsed.get("format") == "camion":
+        for s in steps:
+            if s["position"] == 3:
+                db.update_step(s["id"], "готово", "загружен готовый Камьён")
 
 
 @app.post("/shipments/{shipment_id}/import")
@@ -416,6 +422,13 @@ async def set_step(request: Request, invoice_id: int, step_id: int,
         shipment = db.get_shipment(invoice["shipment_id"])
         data = await f.read()
         _save_original(invoice_id, shipment, invoice, f.filename, data, step_id, user["name"])
+        # Файл приложен к этапу «Камьён» (поз. 3) и это Excel -> обновляем таблицу из него
+        step = db.get_step(step_id)
+        if step and step["position"] == 3 and f.filename.lower().endswith((".xlsx", ".xlsm")):
+            parsed = _parse_xlsx(data)
+            if parsed.get("items"):
+                db.set_invoice_fields(invoice_id, parsed["fields"])
+                db.replace_items(invoice_id, parsed["items"])
     return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
 
 

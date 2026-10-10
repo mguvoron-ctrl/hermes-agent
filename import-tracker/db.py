@@ -418,6 +418,13 @@ def replace_items(invoice_id: int, rows: list[dict]) -> None:
 
 
 # --- Шаги / прогресс -------------------------------------------------------
+def get_step(step_id: int):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM steps WHERE id = ?", (step_id,)).fetchone()
+    conn.close()
+    return row
+
+
 def get_steps(invoice_id: int):
     conn = get_conn()
     rows = conn.execute(
