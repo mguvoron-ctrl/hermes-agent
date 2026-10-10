@@ -11,6 +11,7 @@
 import os
 import secrets
 import shutil
+import tempfile
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
@@ -18,6 +19,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 import db
+import xlsx_import
 
 db.init_db()
 created_admin = db.ensure_admin()
@@ -140,6 +142,73 @@ def add_invoice(request: Request, shipment_id: int, number: str = Form(...),
     return RedirectResponse(f"/shipments/{shipment_id}", status_code=302)
 
 
+def _save_original(invoice_id: int, shipment, invoice, filename: str,
+                   data: bytes, step_id, uploaded_by: str) -> None:
+    """Сохраняет оригинал файла в папку инвойса и регистрирует в базе."""
+    folder = db.invoice_folder(shipment["number"], invoice["number"])
+    dest = folder / filename
+    if dest.exists():
+        dest = folder / f"{secrets.token_hex(4)}_{filename}"
+    with open(dest, "wb") as out:
+        out.write(data)
+    db.add_file(invoice_id, step_id, filename, str(dest), len(data), uploaded_by)
+
+
+@app.post("/shipments/{shipment_id}/import")
+async def import_invoice(request: Request, shipment_id: int,
+                         f: UploadFile = File(...), user=Depends(require_user)):
+    """Создать инвойс, разобрав присланный Excel-файл поставщика."""
+    shipment = db.get_shipment(shipment_id)
+    if not shipment:
+        raise HTTPException(404, "Поставка не найдена")
+
+    data = await f.read()
+    # openpyxl читает с диска — пишем во временный файл
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = tmp.name
+    try:
+        parsed = xlsx_import.parse_invoice(tmp_path)
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+    fields = parsed["fields"]
+    number = fields.get("number") or os.path.splitext(f.filename)[0]
+
+    try:
+        invoice_id = db.create_invoice(shipment_id, number,
+                                       supplier=fields.get("supplier", ""),
+                                       amount=fields.get("amount", ""))
+    except Exception:
+        # инвойс с таким номером уже есть — открываем существующий и обновляем
+        existing = next((i for i in db.list_invoices(shipment_id)
+                         if i["number"] == number), None)
+        if not existing:
+            return RedirectResponse(f"/shipments/{shipment_id}", status_code=302)
+        invoice_id = existing["id"]
+
+    invoice = db.get_invoice(invoice_id)
+    db.set_invoice_fields(invoice_id, {**fields, "source_file": f.filename})
+    if parsed["items"]:
+        db.replace_items(invoice_id, parsed["items"])
+
+    # сохранить оригинал (привязан к этапу «Инвойс»)
+    steps = db.get_steps(invoice_id)
+    first_step_id = steps[0]["id"] if steps else None
+    _save_original(invoice_id, shipment, invoice, f.filename, data,
+                   first_step_id, user["name"])
+
+    # авто-отметка: входящие документы (Инвойс, Пакинг лист, Перевод) пришли в этом файле
+    for s in steps:
+        if s["kind"] == "входящий" and s["position"] <= 2:
+            db.update_step(s["id"], "готово", "получено из Excel-файла")
+
+    return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
+
+
 # --- Инвойс (шаги + файлы) -------------------------------------------------
 @app.get("/invoices/{invoice_id}", response_class=HTMLResponse)
 def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)):
@@ -152,13 +221,14 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
     files_by_step = {}
     for f in files:
         files_by_step.setdefault(f["step_id"], []).append(f)
+    items = db.get_items(invoice_id)
     return templates.TemplateResponse(
         request, "invoice.html",
         {
             "user": user, "invoice": invoice,
             "shipment": shipment, "steps": steps, "files": files,
             "files_by_step": files_by_step, "progress": db.progress(invoice_id),
-            "statuses": db.STATUSES,
+            "statuses": db.STATUSES, "items": items,
         },
     )
 

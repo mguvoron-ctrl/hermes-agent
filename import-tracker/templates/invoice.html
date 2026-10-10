@@ -22,6 +22,51 @@
 </div>
 
 <div class="card">
+  <h2>Данные инвойса</h2>
+  <table>
+    <tr><td class="muted" style="width:220px">Поставщик</td><td>{{ invoice.supplier or "—" }}</td></tr>
+    <tr><td class="muted">Дата инвойса</td><td>{{ invoice.inv_date or "—" }}</td></tr>
+    <tr><td class="muted">Условия поставки</td><td>{{ invoice.incoterms or "—" }}</td></tr>
+    <tr><td class="muted">Валюта</td><td>{{ invoice.currency or "—" }}</td></tr>
+    <tr><td class="muted">Сумма к оплате</td><td><b>{{ invoice.amount or "—" }}</b> {{ invoice.currency or "" }}</td></tr>
+    <tr><td class="muted">Контракт</td><td>{{ invoice.contract or "—" }}</td></tr>
+    <tr><td class="muted">Получатель</td><td>{{ invoice.consignee or "—" }}{% if invoice.inn %} (ИНН {{ invoice.inn }}){% endif %}</td></tr>
+    <tr><td class="muted">№ упаковочного листа</td><td>{{ invoice.packing_list_no or "—" }}</td></tr>
+    <tr><td class="muted">Паллеты / коробки</td><td>{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</td></tr>
+    <tr><td class="muted">Вес нетто / брутто, кг</td><td>{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }}</td></tr>
+    {% if invoice.source_file %}<tr><td class="muted">Файл-источник</td><td>{{ invoice.source_file }}</td></tr>{% endif %}
+  </table>
+</div>
+
+{% if items %}
+<div class="card">
+  <h2>Товары ({{ items|length }})</h2>
+  <div style="overflow-x:auto">
+  <table>
+    <tr>
+      <th>ТН ВЭД</th><th>Артикул</th><th>Наименование</th><th>Штрихкод</th>
+      <th>Кол-во</th><th>Цена</th><th>Сумма</th><th>Нетто</th><th>Брутто</th><th>Кор.</th>
+    </tr>
+    {% for it in items %}
+    <tr>
+      <td>{{ it.hs_code }}</td>
+      <td>{{ it.item_code }}</td>
+      <td>{{ it.name }}{% if it.origin %}<br><span class="muted" style="font-size:12px">{{ it.origin }}</span>{% endif %}</td>
+      <td class="muted" style="font-size:12px">{{ it.barcode }}</td>
+      <td>{{ it.qty }}</td>
+      <td>{{ it.unit_price }}</td>
+      <td>{{ it.total_price }}</td>
+      <td>{{ it.net_weight }}</td>
+      <td>{{ it.gross_weight }}</td>
+      <td>{{ it.box_count }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
   <h2>Этапы процесса</h2>
   {% for s in steps %}
   {% set st = s.status %}

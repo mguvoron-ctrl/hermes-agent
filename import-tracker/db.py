@@ -88,7 +88,38 @@ def init_db() -> None:
             amount      TEXT,
             note        TEXT,
             created_at  TEXT NOT NULL,
+            -- поля, заполняемые автоматически из Excel
+            inv_date         TEXT,
+            incoterms        TEXT,
+            currency         TEXT,
+            total_qty        TEXT,
+            pallets          TEXT,
+            boxes            TEXT,
+            net_weight       TEXT,
+            gross_weight     TEXT,
+            contract         TEXT,
+            consignee        TEXT,
+            inn              TEXT,
+            packing_list_no  TEXT,
+            source_file      TEXT,
             UNIQUE (shipment_id, number)
+        );
+
+        CREATE TABLE IF NOT EXISTS items (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            invoice_id  INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+            position    INTEGER,
+            hs_code     TEXT,     -- Код ТН ВЭД
+            item_code   TEXT,     -- Артикул
+            name        TEXT,     -- Наименование
+            barcode     TEXT,
+            origin      TEXT,
+            qty         TEXT,
+            unit_price  TEXT,
+            total_price TEXT,
+            net_weight  TEXT,
+            gross_weight TEXT,
+            box_count   TEXT
         );
 
         CREATE TABLE IF NOT EXISTS steps (
@@ -114,8 +145,23 @@ def init_db() -> None:
         );
         """
     )
+    # Мягкая миграция: если база создавалась старой версией — добираем новые колонки
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(invoices)")}
+    for col in ("inv_date", "incoterms", "currency", "total_qty", "pallets",
+                "boxes", "net_weight", "gross_weight", "contract", "consignee",
+                "inn", "packing_list_no", "source_file"):
+        if col not in existing:
+            conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} TEXT")
     conn.commit()
     conn.close()
+
+
+# Поля инвойса, которые заполняет парсер Excel
+INVOICE_IMPORT_FIELDS = [
+    "number", "supplier", "amount", "inv_date", "incoterms", "currency",
+    "total_qty", "pallets", "boxes", "net_weight", "gross_weight",
+    "contract", "consignee", "inn", "packing_list_no",
+]
 
 
 # --- Пользователи / пароли -------------------------------------------------
@@ -241,6 +287,58 @@ def get_invoice(invoice_id: int):
     row = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
     conn.close()
     return row
+
+
+# Разрешённые к записи колонки инвойса (чтобы не было SQL-инъекции через имена колонок)
+_INVOICE_COLS = {
+    "supplier", "amount", "note", "inv_date", "incoterms", "currency",
+    "total_qty", "pallets", "boxes", "net_weight", "gross_weight",
+    "contract", "consignee", "inn", "packing_list_no", "source_file",
+}
+
+
+def set_invoice_fields(invoice_id: int, fields: dict) -> None:
+    """Обновляет только переданные (непустые) поля инвойса."""
+    cols = {k: v for k, v in fields.items()
+            if k in _INVOICE_COLS and v not in (None, "")}
+    if not cols:
+        return
+    sets = ", ".join(f"{k} = ?" for k in cols)
+    conn = get_conn()
+    conn.execute(f"UPDATE invoices SET {sets} WHERE id = ?",
+                 (*cols.values(), invoice_id))
+    conn.commit()
+    conn.close()
+
+
+# --- Товары (строки инвойса) ----------------------------------------------
+def get_items(invoice_id: int):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM items WHERE invoice_id = ? ORDER BY position, id",
+        (invoice_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def replace_items(invoice_id: int, rows: list[dict]) -> None:
+    """Полностью заменяет товары инвойса (при повторном импорте)."""
+    conn = get_conn()
+    conn.execute("DELETE FROM items WHERE invoice_id = ?", (invoice_id,))
+    for pos, it in enumerate(rows):
+        conn.execute(
+            """INSERT INTO items (invoice_id, position, hs_code, item_code, name,
+                                  barcode, origin, qty, unit_price, total_price,
+                                  net_weight, gross_weight, box_count)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (invoice_id, pos, it.get("hs_code", ""), it.get("item_code", ""),
+             it.get("name", ""), it.get("barcode", ""), it.get("origin", ""),
+             it.get("qty", ""), it.get("unit_price", ""), it.get("total_price", ""),
+             it.get("net_weight", ""), it.get("gross_weight", ""), it.get("box_count", "")),
+        )
+    conn.commit()
+    conn.close()
 
 
 # --- Шаги / прогресс -------------------------------------------------------

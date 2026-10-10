@@ -5,8 +5,19 @@
 <h1>Поставка {{ shipment.number }}</h1>
 {% if shipment.title %}<p class="muted">{{ shipment.title }}</p>{% endif %}
 
+<div class="card" style="border-color:#cfe0ff; background:#f7faff">
+  <h2>📥 Загрузить инвойс из Excel (рекомендуется)</h2>
+  <p class="muted">Присланный поставщиком файл (листы FAC-IN / Packing list / Перевод).
+     Система сама создаст инвойс, заполнит поля, товары и сохранит оригинал.</p>
+  <form method="post" action="/shipments/{{ shipment.id }}/import"
+        enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center">
+    <input type="file" name="f" accept=".xlsx,.xlsm" required>
+    <button class="btn" type="submit">Загрузить и разобрать</button>
+  </form>
+</div>
+
 <div class="card">
-  <h2>Новый инвойс в этой поставке</h2>
+  <h2>…или добавить инвойс вручную</h2>
   <form method="post" action="/shipments/{{ shipment.id }}/invoices">
     <div class="row">
       <div style="flex:0 0 180px">
