@@ -175,7 +175,38 @@ def init_db() -> None:
     if "name_en" not in existing_items:
         conn.execute("ALTER TABLE items ADD COLUMN name_en TEXT")
     conn.commit()
+    _load_ref_seed_if_empty(conn)
     conn.close()
+
+
+def _load_ref_seed_if_empty(conn) -> None:
+    """Первый запуск: если справочник пуст, заполняем его из встроенного
+    файла ref_seed.json.gz (TRANSIT + НОВИНКИ, собранные заранее)."""
+    try:
+        cnt = conn.execute("SELECT COUNT(*) c FROM article_ref").fetchone()["c"]
+    except Exception:
+        return
+    if cnt:
+        return
+    seed = BASE_DIR / "ref_seed.json.gz"
+    if not seed.exists():
+        return
+    import json as _json
+    import gzip as _gzip
+    try:
+        with _gzip.open(seed, "rt", encoding="utf-8") as f:
+            rows = _json.load(f)
+    except Exception:
+        return
+    conn.executemany(
+        """INSERT OR IGNORE INTO article_ref
+           (article, hs_code, ean, name_rus, origin, producer, source, supply_key, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        [(r.get("article", ""), r.get("hs_code", ""), r.get("ean", ""),
+          r.get("name_rus", ""), r.get("origin", ""), r.get("producer", ""),
+          r.get("source", "seed"), r.get("supply_key", 0), now()) for r in rows],
+    )
+    conn.commit()
 
 
 # Поля инвойса, которые заполняет парсер Excel
