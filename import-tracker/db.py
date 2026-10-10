@@ -140,6 +140,18 @@ def init_db() -> None:
             updated_at  TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS article_ref (
+            article    TEXT PRIMARY KEY,   -- нормализованный артикул
+            hs_code    TEXT,               -- Код ТН ВЭД
+            ean        TEXT,
+            name_rus   TEXT,               -- рус. наименование
+            origin     TEXT,               -- страна (Origine)
+            producer   TEXT,               -- Fournisseur / производитель
+            source     TEXT,               -- 'transit' | 'novinki'
+            supply_key INTEGER DEFAULT 0,
+            updated_at TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS files (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             invoice_id   INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
@@ -496,6 +508,71 @@ def shipment_folder(shipment_number: str) -> Path:
     folder = FILES_DIR / _safe(shipment_number)
     folder.mkdir(parents=True, exist_ok=True)
     return folder
+
+
+# --- Справочник артикулов (TRANSIT / НОВИНКИ) ------------------------------
+def ref_upsert_transit(rows: list[dict]) -> int:
+    """TRANSIT имеет приоритет — перезаписывает запись по артикулу."""
+    conn = get_conn()
+    conn.executemany(
+        """INSERT OR REPLACE INTO article_ref
+           (article, hs_code, ean, name_rus, origin, producer, source, supply_key, updated_at)
+           VALUES (?,?,?,?,?,?, 'transit', ?, ?)""",
+        [(r["article"], r.get("hs_code", ""), r.get("ean", ""), r.get("name_rus", ""),
+          r.get("origin", ""), r.get("producer", ""), r.get("supply_key", 0), now())
+         for r in rows],
+    )
+    conn.commit()
+    conn.close()
+    return len(rows)
+
+
+def ref_upsert_novinki(rows: list[dict]) -> int:
+    """НОВИНКИ добавляют только артикулы, которых ещё нет (TRANSIT не трогаем)."""
+    conn = get_conn()
+    conn.executemany(
+        """INSERT OR IGNORE INTO article_ref
+           (article, hs_code, ean, name_rus, origin, producer, source, supply_key, updated_at)
+           VALUES (?,?,?,?,?,?, 'novinki', 0, ?)""",
+        [(r["article"], r.get("hs_code", ""), r.get("ean", ""), r.get("name_rus", ""),
+          r.get("origin", ""), r.get("producer", ""), now()) for r in rows],
+    )
+    conn.commit()
+    conn.close()
+    return len(rows)
+
+
+def ref_get(article: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM article_ref WHERE article = ?", (article,)).fetchone()
+    conn.close()
+    return row
+
+
+def ref_get_many(articles: list[str]) -> dict:
+    """Пакетный поиск: {article: row} для переданных артикулов."""
+    if not articles:
+        return {}
+    conn = get_conn()
+    out = {}
+    uniq = list({a for a in articles if a})
+    for i in range(0, len(uniq), 400):
+        chunk = uniq[i:i + 400]
+        q = "SELECT * FROM article_ref WHERE article IN (%s)" % ",".join("?" * len(chunk))
+        for r in conn.execute(q, chunk):
+            out[r["article"]] = r
+    conn.close()
+    return out
+
+
+def ref_stats() -> dict:
+    conn = get_conn()
+    total = conn.execute("SELECT COUNT(*) c FROM article_ref").fetchone()["c"]
+    tr = conn.execute("SELECT COUNT(*) c FROM article_ref WHERE source='transit'").fetchone()["c"]
+    nv = conn.execute("SELECT COUNT(*) c FROM article_ref WHERE source='novinki'").fetchone()["c"]
+    last = conn.execute("SELECT MAX(updated_at) m FROM article_ref").fetchone()["m"]
+    conn.close()
+    return {"total": total, "transit": tr, "novinki": nv, "updated": last}
 
 
 def invoice_folder(shipment_number: str, invoice_number: str) -> Path:

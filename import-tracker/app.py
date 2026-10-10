@@ -21,6 +21,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import db
 import xlsx_import
+import ref_import
 
 db.init_db()
 created_admin = db.ensure_admin()
@@ -264,6 +265,7 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
         files_by_step.setdefault(f["step_id"], []).append(f)
     items = db.get_items(invoice_id)
     totals = _item_totals(items)
+    vitems, vsummary = validate_items(items)
     items_json = json.dumps(
         [{k: (it[k] or "") for k in ITEM_FIELDS} for it in items],
         ensure_ascii=False,
@@ -275,6 +277,7 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
             "shipment": shipment, "steps": steps, "files": files,
             "files_by_step": files_by_step, "progress": db.progress(invoice_id),
             "statuses": db.STATUSES, "items": items, "totals": totals,
+            "vitems": vitems, "vsummary": vsummary,
             "items_json": items_json, "nav": "invoices",
         },
     )
@@ -282,6 +285,82 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
 
 ITEM_FIELDS = ["hs_code", "item_code", "barcode", "name", "name_en", "origin",
                "qty", "unit_price", "total_price", "net_weight", "gross_weight", "box_count"]
+
+
+def _has_cyr(s) -> bool:
+    import re
+    return bool(re.search(r"[А-Яа-яЁё]", str(s or "")))
+
+
+def _digits(s) -> str:
+    import re
+    return re.sub(r"\D", "", str(s or ""))
+
+
+def validate_items(items):
+    """Сверяет товары инвойса со справочником (TRANSIT/Новинки).
+    Возвращает список строк с данными для показа + статусами ячеек
+    ('ok' | 'warn' | 'bad') и сводку проблем."""
+    refmap = db.ref_get_many([ref_import.norm_art(it["item_code"]) for it in items])
+    out, bad, warn = [], 0, 0
+    for it in items:
+        ref = refmap.get(ref_import.norm_art(it["item_code"]))
+        row = {k: it[k] for k in ITEM_FIELDS}
+
+        # --- ТН ВЭД ---
+        if ref is None:
+            row["hs_st"] = "warn"; row["hs_ref"] = ""
+        elif ref["hs_code"] and str(ref["hs_code"]).strip() == str(it["hs_code"]).strip():
+            row["hs_st"] = "ok"; row["hs_ref"] = ""
+        elif ref["hs_code"]:
+            row["hs_st"] = "bad"; row["hs_ref"] = ref["hs_code"]
+        else:
+            row["hs_st"] = "warn"; row["hs_ref"] = ""
+
+        # --- EAN ---
+        inv_ean = _digits(it["barcode"])
+        ref_ean = _digits(ref["ean"]) if ref else ""
+        if not inv_ean:
+            row["ean_st"] = "bad"
+        elif ref is None or not ref_ean:
+            row["ean_st"] = "warn"
+        elif inv_ean == ref_ean:
+            row["ean_st"] = "ok"
+        else:
+            row["ean_st"] = "bad"
+
+        # --- Страна (TRANSIT -> инвойс(жёлтый) -> нет(красный)) ---
+        if ref and ref["origin"]:
+            row["origin"] = ref["origin"]; row["origin_st"] = "ok"
+        elif it["origin"]:
+            row["origin_st"] = "warn"
+        else:
+            row["origin_st"] = "bad"
+
+        # --- Производитель (только из справочника) ---
+        row["producer"] = ref["producer"] if ref else ""
+        row["prod_st"] = "ok" if row["producer"] else "bad"
+
+        # --- Рус. название ---
+        if ref and _has_cyr(ref["name_rus"]):
+            if not _has_cyr(it["name"]):
+                row["name"] = ref["name_rus"]
+            row["rus_st"] = "ok"
+        elif _has_cyr(it["name"]):
+            row["rus_st"] = "warn"
+        else:
+            row["rus_st"] = "bad"
+
+        has_bad = any(row[k] == "bad" for k in ("hs_st", "ean_st", "origin_st", "prod_st", "rus_st"))
+        has_warn = any(row[k] == "warn" for k in ("hs_st", "ean_st", "origin_st", "prod_st", "rus_st"))
+        if has_bad:
+            bad += 1
+        elif has_warn:
+            warn += 1
+        row["problem"] = has_bad or has_warn
+        out.append(row)
+    summary = {"bad": bad, "warn": warn, "checked": bool(refmap) or db.ref_stats()["total"] > 0}
+    return out, summary
 
 
 @app.post("/invoices/{invoice_id}/items")
@@ -410,6 +489,86 @@ def add_user(request: Request, username: str = Form(...), password: str = Form(.
     return templates.TemplateResponse(
         request, "users.html", {"user": user, "users": db.list_users(), "error": error, "nav": "users"}
     )
+
+
+# --- Справочники (TRANSIT / НОВИНКИ) --------------------------------------
+@app.get("/references", response_class=HTMLResponse)
+def references_page(request: Request, user=Depends(require_user), msg: str = ""):
+    if user["role"] != "admin":
+        raise HTTPException(403, "Только для администратора")
+    return templates.TemplateResponse(
+        request, "references.html",
+        {"user": user, "stats": db.ref_stats(), "msg": msg, "nav": "references"},
+    )
+
+
+def _save_tmp(data: bytes, suffix: str) -> str:
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(data)
+        return tmp.name
+
+
+@app.post("/references/transit")
+async def references_transit(request: Request, f: UploadFile = File(...),
+                             password: str = Form(""), user=Depends(require_user)):
+    if user["role"] != "admin":
+        raise HTTPException(403)
+    data = await f.read()
+    path = _save_tmp(data, ".xlsx")
+    dec = None
+    try:
+        # пробуем расшифровать (файл под паролем); если не зашифрован — читаем как есть
+        try:
+            import msoffcrypto
+            with open(path, "rb") as fh:
+                off = msoffcrypto.OfficeFile(fh)
+                off.load_key(password=password or "2208")
+                dec = _save_tmp(b"", ".xlsx")
+                with open(dec, "wb") as out:
+                    off.decrypt(out)
+            parse_path = dec
+        except Exception:
+            parse_path = path
+        rows = ref_import.parse_transit(parse_path)
+        n = db.ref_upsert_transit(rows)
+        msg = f"TRANSIT загружен: {n} артикулов (по самой свежей поставке)."
+    except Exception as e:
+        msg = f"Ошибка загрузки TRANSIT: {e}"
+    finally:
+        for p in (path, dec):
+            if p:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+    return RedirectResponse(f"/references?msg={msg}", status_code=302)
+
+
+@app.post("/references/novinki")
+async def references_novinki(request: Request, files: list[UploadFile] = File(...),
+                             user=Depends(require_user)):
+    if user["role"] != "admin":
+        raise HTTPException(403)
+    total, done = 0, 0
+    for f in files:
+        if not f.filename:
+            continue
+        data = await f.read()
+        suffix = ".xlsb" if f.filename.lower().endswith(".xlsb") else ".xlsx"
+        path = _save_tmp(data, suffix)
+        try:
+            rows = ref_import.parse_novinki(path)
+            db.ref_upsert_novinki(rows)
+            total += len(rows); done += 1
+        except Exception as e:
+            print("novinki error", f.filename, e)
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    msg = f"Новинки загружены: {done} файлов, {total} артикулов (добавлены недостающие)."
+    return RedirectResponse(f"/references?msg={msg}", status_code=302)
 
 
 if __name__ == "__main__":

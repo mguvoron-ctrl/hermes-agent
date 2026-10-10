@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Справочники{% endblock %}
+{% block content %}
+<h1>Справочники</h1>
+<p class="sub">TRANSIT и НОВИНКИ — по ним система сама проверяет коды ТН ВЭД, EAN, страну,
+   производителя и подставляет русские названия при загрузке инвойса.</p>
+
+{% if msg %}<div class="card" style="border-color:#cfe0ff; background:#f6f9ff">{{ msg }}</div>{% endif %}
+
+<div class="card">
+  <h2>Что сейчас в справочнике</h2>
+  <table class="info" style="max-width:640px">
+    <tr><td class="k">Всего артикулов</td><td class="v"><b>{{ stats.total }}</b></td></tr>
+    <tr><td class="k">из них из TRANSIT</td><td class="v">{{ stats.transit }}</td></tr>
+    <tr><td class="k">из НОВИНОК</td><td class="v">{{ stats.novinki }}</td></tr>
+    <tr><td class="k">Обновлено</td><td class="v">{{ stats.updated or "—" }}</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Загрузить TRANSIT</h2>
+  <p class="muted" style="margin-top:-6px">Мастер-база всех поставок. По каждому артикулу берётся
+     <b>самая свежая поставка</b>. Файл под паролем — укажи его (по умолчанию 2208).</p>
+  <form method="post" action="/references/transit" enctype="multipart/form-data"
+        style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+    <input type="file" name="f" accept=".xlsx" required style="flex:1; min-width:220px">
+    <input type="text" name="password" placeholder="пароль (2208)" value="2208" style="flex:0 0 150px">
+    <button class="btn" type="submit">Загрузить TRANSIT</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Загрузить НОВИНКИ</h2>
+  <p class="muted" style="margin-top:-6px">Файлы новинок по брендам (.xlsx и .xlsb). Добавят артикулы,
+     которых ещё нет в TRANSIT. Можно выбрать сразу несколько файлов.</p>
+  <form method="post" action="/references/novinki" enctype="multipart/form-data"
+        style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+    <input type="file" name="files" accept=".xlsx,.xlsb" multiple required style="flex:1; min-width:220px">
+    <button class="btn" type="submit">Загрузить новинки</button>
+  </form>
+</div>
+{% endblock %}

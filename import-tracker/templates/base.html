@@ -145,6 +145,11 @@
     .goods td.nm-ru{min-width:230px; font-weight:500; color:var(--ink)}
     .goods td.muted{min-width:200px}
     .goods .mono{font-size:13px}
+    /* подсветка проблем сверки (как в макросе Камьён) */
+    td.c-bad{background:#fde3e3 !important}
+    td.c-warn{background:#fdf6da !important}
+    .pill.bad{background:#fde3e3; color:#c0393e}
+    .pill.warn{background:#fdf6da; color:#9a6a00}
 
     /* редактор таблицы товаров */
     .ed-grid{border-collapse:collapse; font-size:12.5px}
@@ -192,6 +197,7 @@
     <nav>
       <a href="/" class="{{ 'active' if nav=='shipments' else '' }}">Поставки</a>
       <a href="/invoices" class="{{ 'active' if nav=='invoices' else '' }}">Все инвойсы</a>
+      {% if user.role == 'admin' %}<a href="/references" class="{{ 'active' if nav=='references' else '' }}">Справочники</a>{% endif %}
       {% if user.role == 'admin' %}<a href="/users" class="{{ 'active' if nav=='users' else '' }}">Пользователи</a>{% endif %}
     </nav>
     <span class="spacer"></span>

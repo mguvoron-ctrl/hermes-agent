@@ -90,27 +90,45 @@
     <button class="btn sm ghost" style="margin-left:auto" type="button" onclick="startEditGoods()">✏️ Изменить таблицу</button>
   </div>
 
-  <div id="goods-read" style="margin-top:12px">
+  {% if vsummary.checked %}
+    {% if vsummary.bad or vsummary.warn %}
+    <div class="ed-hint" style="margin-top:4px">
+      Сверка со справочником:
+      {% if vsummary.bad %}<span class="pill bad">🔴 {{ vsummary.bad }} с ошибкой</span>{% endif %}
+      {% if vsummary.warn %}<span class="pill warn">🟡 {{ vsummary.warn }} под вопросом</span>{% endif %}
+      — проблемные ячейки подсвечены ниже.
+    </div>
+    {% else %}
+    <div class="ed-hint" style="margin-top:4px"><span class="badge ok">✓ Сверка со справочником пройдена</span></div>
+    {% endif %}
+  {% else %}
+    <div class="ed-hint" style="margin-top:4px">Справочник не загружен — сверка кодов недоступна.
+      <a href="/references">Загрузить TRANSIT/Новинки</a></div>
+  {% endif %}
+
+  <div id="goods-read" style="margin-top:10px">
   {% if items %}
   <div class="scroll-x">
   <table class="striped goods">
     <thead>
       <tr>
         <th>ТН ВЭД</th><th>Артикул</th><th>EAN</th>
-        <th>Наименование (рус)</th><th>Название (англ)</th><th>Страна</th>
+        <th>Наименование (рус)</th><th>Название (англ)</th><th>Страна</th><th>Производитель</th>
         <th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th>
         <th class="num">Нетто</th><th class="num">Брутто</th><th class="num">Коробки</th>
       </tr>
     </thead>
     <tbody>
-    {% for it in items %}
+    {% for it in vitems %}
+      {% set cl = {'ok':'', 'warn':'c-warn', 'bad':'c-bad'} %}
       <tr>
-        <td class="mono muted">{{ it.hs_code }}</td>
+        <td class="mono muted {{ cl[it.hs_st] }}" {% if it.hs_ref %}title="В справочнике: {{ it.hs_ref }}"{% endif %}>{{ it.hs_code }}</td>
         <td class="mono">{{ it.item_code }}</td>
-        <td class="mono muted">{{ it.barcode or "—" }}</td>
-        <td class="nm-ru">{{ it.name }}</td>
+        <td class="mono muted {{ cl[it.ean_st] }}">{{ it.barcode or "—" }}</td>
+        <td class="nm-ru {{ cl[it.rus_st] }}">{{ it.name }}</td>
         <td class="muted">{{ it.name_en or "—" }}</td>
-        <td>{{ it.origin or "—" }}</td>
+        <td class="{{ cl[it.origin_st] }}">{{ it.origin or "—" }}</td>
+        <td class="{{ cl[it.prod_st] }}">{{ it.producer or "—" }}</td>
         <td class="num">{{ it.qty }}</td>
         <td class="num">{{ it.unit_price }}</td>
         <td class="num">{{ it.total_price }}</td>
@@ -122,7 +140,7 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="6">Итого</td>
+        <td colspan="7">Итого</td>
         <td class="num">{{ totals.qty }}</td>
         <td></td>
         <td class="num">{{ totals.total_price }}</td>
