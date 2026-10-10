@@ -255,10 +255,21 @@ def get_steps(invoice_id: int):
 
 def update_step(step_id: int, status: str, note: str = "") -> None:
     conn = get_conn()
+    row = conn.execute(
+        "SELECT invoice_id, position FROM steps WHERE id = ?", (step_id,)
+    ).fetchone()
     conn.execute(
         "UPDATE steps SET status = ?, note = ?, updated_at = ? WHERE id = ?",
         (status, note.strip(), now(), step_id),
     )
+    # Автопереход: когда этап отмечен "готово", следующий этап по порядку
+    # сам становится "в работе" (только если он ещё "не начато").
+    if row and status == "готово":
+        conn.execute(
+            """UPDATE steps SET status = 'в работе', updated_at = ?
+               WHERE invoice_id = ? AND position = ? AND status = 'не начато'""",
+            (now(), row["invoice_id"], row["position"] + 1),
+        )
     conn.commit()
     conn.close()
 
