@@ -67,7 +67,7 @@ def build_camion_xlsx(invoice, vitems) -> bytes:
         ws.cell(r, 12, it["origin"])
         ws.cell(r, 13, it["producer"])
         ws.cell(r, 14, it["barcode"]).number_format = "@"
-        ws.cell(r, 15, 1)
+        ws.cell(r, 15, xl_num(it.get("set_count")) or 1)
         for col, st in ((1, it["hs_st"]), (4, it["rus_st"]), (12, it["origin_st"]),
                         (13, it["prod_st"]), (14, it["ean_st"])):
             if st in fill:

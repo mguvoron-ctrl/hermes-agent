@@ -292,7 +292,8 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
 
 
 ITEM_FIELDS = ["hs_code", "item_code", "barcode", "name", "name_en", "origin",
-               "qty", "unit_price", "total_price", "net_weight", "gross_weight", "box_count"]
+               "qty", "unit_price", "total_price", "net_weight", "gross_weight",
+               "box_count", "set_count"]
 
 
 def _has_cyr(s) -> bool:

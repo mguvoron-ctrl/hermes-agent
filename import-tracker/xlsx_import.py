@@ -272,6 +272,7 @@ def parse_camion(mats) -> dict:
     c_inv = col("invoice", "инвойс")
     c_orig = col("origine", "origin", "страна")
     c_ean = col("ean", "штрих")
+    c_set = col("колвосост", "составля", "набор")
 
     # метаданные
     fields = {}
@@ -305,6 +306,7 @@ def parse_camion(mats) -> dict:
             "net_weight": _fmt(_cell(m, i, c_net)) if c_net is not None else "",
             "gross_weight": _fmt(_cell(m, i, c_brut)) if c_brut is not None else "",
             "box_count": _fmt(_cell(m, i, c_box)) if c_box is not None else "",
+            "set_count": _fmt(_cell(m, i, c_set)) if c_set is not None else "1",
         })
     if inv_no:
         fields["number"] = inv_no

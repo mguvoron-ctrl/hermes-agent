@@ -122,6 +122,7 @@
         <th>Наименование (рус)</th><th>Название (англ)</th><th>Страна</th><th>Производитель</th>
         <th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th>
         <th class="num">Нетто</th><th class="num">Брутто</th><th class="num">Коробки</th>
+        <th class="num" title="Кол-во составляющих в наборе">Сост.</th>
       </tr>
     </thead>
     <tbody>
@@ -141,6 +142,7 @@
         <td class="num">{{ it.net_weight or "—" }}</td>
         <td class="num">{{ it.gross_weight or "—" }}</td>
         <td class="num">{{ it.box_count or "—" }}</td>
+        <td class="num">{{ it.set_count or "1" }}</td>
       </tr>
     {% endfor %}
     </tbody>
@@ -153,6 +155,7 @@
         <td class="num">{{ totals.net }}</td>
         <td class="num">{{ totals.gross }}</td>
         <td class="num">{{ totals.boxes }}</td>
+        <td></td>
       </tr>
     </tfoot>
   </table>
@@ -182,7 +185,8 @@ const GOODS_COLS=[
   {k:'hs_code',l:'ТН ВЭД'},{k:'item_code',l:'Артикул'},{k:'barcode',l:'EAN'},
   {k:'name',l:'Наименование (рус)',wide:true},{k:'name_en',l:'Название (англ)',wide:true},{k:'origin',l:'Страна'},
   {k:'qty',l:'Кол-во'},{k:'unit_price',l:'Цена'},{k:'total_price',l:'Сумма'},
-  {k:'net_weight',l:'Нетто'},{k:'gross_weight',l:'Брутто'},{k:'box_count',l:'Коробки'}
+  {k:'net_weight',l:'Нетто'},{k:'gross_weight',l:'Брутто'},{k:'box_count',l:'Коробки'},
+  {k:'set_count',l:'Кол-во сост.'}
 ];
 let GOODS_DATA=[];
 try{ GOODS_DATA=JSON.parse(document.getElementById('goods-json').textContent||'[]'); }catch(e){ GOODS_DATA=[]; }

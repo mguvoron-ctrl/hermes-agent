@@ -126,7 +126,8 @@ def init_db() -> None:
             total_price TEXT,
             net_weight  TEXT,
             gross_weight TEXT,
-            box_count   TEXT
+            box_count   TEXT,
+            set_count   TEXT DEFAULT '1'   -- Кол-во составляющих в наборе
         );
 
         CREATE TABLE IF NOT EXISTS steps (
@@ -178,6 +179,8 @@ def init_db() -> None:
     existing_ref = {r["name"] for r in conn.execute("PRAGMA table_info(article_ref)")}
     if "source_name" not in existing_ref:
         conn.execute("ALTER TABLE article_ref ADD COLUMN source_name TEXT")
+    if "set_count" not in existing_items:
+        conn.execute("ALTER TABLE items ADD COLUMN set_count TEXT DEFAULT '1'")
     conn.commit()
     _load_ref_seed_if_empty(conn)
     conn.close()
@@ -411,13 +414,14 @@ def replace_items(invoice_id: int, rows: list[dict]) -> None:
         conn.execute(
             """INSERT INTO items (invoice_id, position, hs_code, item_code, name, name_en,
                                   barcode, origin, qty, unit_price, total_price,
-                                  net_weight, gross_weight, box_count)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                  net_weight, gross_weight, box_count, set_count)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (invoice_id, pos, it.get("hs_code", ""), it.get("item_code", ""),
              it.get("name", ""), it.get("name_en", ""), it.get("barcode", ""),
              it.get("origin", ""), it.get("qty", ""), it.get("unit_price", ""),
              it.get("total_price", ""), it.get("net_weight", ""),
-             it.get("gross_weight", ""), it.get("box_count", "")),
+             it.get("gross_weight", ""), it.get("box_count", ""),
+             (str(it.get("set_count", "") or "1").strip() or "1")),
         )
     conn.commit()
     conn.close()
