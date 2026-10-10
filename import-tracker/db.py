@@ -240,6 +240,8 @@ def create_shipment(number: str, title: str = "", note: str = "") -> int:
     conn.commit()
     sid = cur.lastrowid
     conn.close()
+    # сразу создаём папку поставки на диске
+    shipment_folder(number)
     return sid
 
 
@@ -270,6 +272,10 @@ def create_invoice(shipment_id: int, number: str, supplier: str = "",
         (shipment_id, number.strip(), supplier.strip(), amount.strip(), note.strip(), now()),
     )
     invoice_id = cur.lastrowid
+    # сразу создаём подпапку инвойса внутри папки поставки
+    sh = conn.execute("SELECT number FROM shipments WHERE id = ?", (shipment_id,)).fetchone()
+    if sh:
+        invoice_folder(sh["number"], number)
     # Копируем шаблон шагов именно этому инвойсу
     for pos, (name, kind) in enumerate(DEFAULT_STEPS):
         conn.execute(
@@ -430,11 +436,20 @@ def delete_file(file_id: int) -> None:
     conn.close()
 
 
-def invoice_folder(shipment_number: str, invoice_number: str) -> Path:
-    """Реальная папка на диске для документов инвойса."""
-    def safe(name: str) -> str:
-        return "".join(c if c.isalnum() or c in "-_." else "_" for c in name).strip("_") or "x"
+def _safe(name: str) -> str:
+    """Безопасное имя папки/файла (без запрещённых символов)."""
+    return "".join(c if c.isalnum() or c in "-_." else "_" for c in str(name)).strip("_") or "x"
 
-    folder = FILES_DIR / safe(shipment_number) / safe(invoice_number)
+
+def shipment_folder(shipment_number: str) -> Path:
+    """Папка поставки на диске (создаётся при необходимости)."""
+    folder = FILES_DIR / _safe(shipment_number)
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def invoice_folder(shipment_number: str, invoice_number: str) -> Path:
+    """Папка инвойса (подпапка внутри папки поставки)."""
+    folder = FILES_DIR / _safe(shipment_number) / _safe(invoice_number)
     folder.mkdir(parents=True, exist_ok=True)
     return folder
