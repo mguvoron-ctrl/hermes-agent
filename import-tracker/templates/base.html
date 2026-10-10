@@ -161,8 +161,24 @@
     .ed-grid input:focus{outline:none; border-color:var(--accent);
       box-shadow:0 0 0 2px var(--accent-weak); background:#fff}
     .ed-grid input.wide{min-width:200px}
+    .ed-grid td.ro{padding:5px 8px; color:#555; font-size:12.5px; white-space:nowrap; background:#fafbfc}
     .ed-grid .rowdel{color:var(--danger); cursor:pointer; text-align:center; font-weight:700; user-select:none}
     .ed-hint{color:var(--muted); font-size:12.5px; margin:8px 0}
+
+    /* сворачиваемые карточки (раскрывающийся список) */
+    .card.collapsible > .card-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      cursor:pointer; user-select:none; margin:0}
+    .card.collapsible > .card-head h2{margin:0}
+    .card.collapsible > .card-head .chev{color:var(--muted); font-size:13px; transition:transform .18s ease;
+      display:inline-block; width:14px; text-align:center}
+    .card.collapsible.collapsed > .card-head .chev{transform:rotate(-90deg)}
+    .card.collapsible > .card-body{overflow:hidden; transition:max-height .22s ease, opacity .18s ease,
+      margin-top .18s ease; max-height:20000px; opacity:1; margin-top:12px}
+    .card.collapsible.collapsed > .card-body{max-height:0; opacity:0; margin-top:0}
+    .card.collapsible.collapsed{padding-bottom:16px}
+    .card-head .cnt{font-weight:500; color:var(--muted)}
+    .card-head .tag-collapsed{display:none; font-size:12px; color:var(--muted); margin-left:4px}
+    .card.collapsible.collapsed .tag-collapsed{display:inline}
 
     /* плитки источников справочника */
     .tiles{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px}
@@ -253,6 +269,21 @@
       el.addEventListener('click', function(e){
         if(moved){ e.preventDefault(); e.stopPropagation(); moved=false; }
       }, true);
+    });
+  });
+
+  // Сворачиваемые карточки: клик по шапке сворачивает/разворачивает,
+  // состояние запоминается в браузере (localStorage) по id карточки.
+  document.addEventListener('DOMContentLoaded', function(){
+    document.querySelectorAll('.card.collapsible').forEach(function(card){
+      var head=card.querySelector('.card-head'); if(!head) return;
+      var key='collapse:'+(card.id||'');
+      try{ if(card.id && localStorage.getItem(key)==='1') card.classList.add('collapsed'); }catch(e){}
+      head.addEventListener('click', function(e){
+        if(e.target.closest('a,button,input,select,textarea')) return; // не мешаем кнопкам внутри шапки
+        card.classList.toggle('collapsed');
+        try{ if(card.id) localStorage.setItem(key, card.classList.contains('collapsed')?'1':'0'); }catch(e){}
+      });
     });
   });
   </script>

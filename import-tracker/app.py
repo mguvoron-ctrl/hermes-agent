@@ -275,8 +275,13 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
     totals = _item_totals(items)
     vitems, vsummary = validate_items(items)
     kits = _build_kits(invoice_id, items)
+    # Данные для встроенного редактора товаров: значения из сверки
+    # (обогащённые страной/рус-названием/производителем) + статусы ячеек,
+    # чтобы прямо в редактируемой таблице были подсвечены проблемы.
+    _ed_keys = ITEM_FIELDS + ["producer", "hs_st", "ean_st", "origin_st",
+                              "prod_st", "rus_st", "hs_ref"]
     items_json = json.dumps(
-        [{k: (it[k] or "") for k in ITEM_FIELDS} for it in items],
+        [{k: (v.get(k, "") or "") for k in _ed_keys} for v in vitems],
         ensure_ascii=False,
     )
     return templates.TemplateResponse(

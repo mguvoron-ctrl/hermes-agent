@@ -59,8 +59,13 @@
   </form>
 </div>
 
-<div class="card">
-  <h2>Данные инвойса</h2>
+<div class="card collapsible" id="card-info">
+  <div class="card-head">
+    <span class="chev">▾</span>
+    <h2>Данные инвойса</h2>
+    <span class="tag-collapsed">— нажми, чтобы раскрыть</span>
+  </div>
+  <div class="card-body">
   <table class="info">
     <tr>
       <td class="k">Поставщик</td><td class="v">{{ invoice.supplier or "—" }}</td>
@@ -83,14 +88,17 @@
       <td class="k">Контракт</td><td class="v">{{ invoice.contract or "—" }}</td>
     </tr>
   </table>
+  </div>{# /card-body #}
 </div>
 
-<div class="card" id="goods-card">
-  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
-    <h2 style="margin:0">Товары <span class="muted" style="font-weight:500">({{ items|length }})</span></h2>
+<div class="card collapsible" id="card-goods">
+  <div class="card-head">
+    <span class="chev">▾</span>
+    <h2>Товары <span class="cnt">({{ items|length }})</span></h2>
+    <span class="tag-collapsed">— нажми, чтобы раскрыть</span>
     <a class="btn sm" style="margin-left:auto" href="/invoices/{{ invoice.id }}/camion.xlsx">⬇️ Скачать Камьён (Excel)</a>
-    <button class="btn sm ghost" type="button" onclick="startEditGoods()">✏️ Изменить таблицу</button>
   </div>
+  <div class="card-body">
 
   {% if camion_updated %}
   <div class="ed-hint" style="margin-top:6px"><span class="badge ok">✓ Таблица обновлена из загруженного Камьёна</span></div>
@@ -112,93 +120,57 @@
       <a href="/references">Загрузить TRANSIT/Новинки</a></div>
   {% endif %}
 
-  <div id="goods-read" style="margin-top:10px">
-  {% if items %}
-  <div class="scroll-x">
-  <table class="striped goods">
-    <thead>
-      <tr>
-        <th>ТН ВЭД</th><th>Артикул</th><th>EAN</th>
-        <th>Наименование (рус)</th><th>Название (англ)</th><th>Страна</th><th>Производитель</th>
-        <th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th>
-        <th class="num">Нетто</th><th class="num">Брутто</th><th class="num">Коробки</th>
-        <th class="num" title="Кол-во составляющих в наборе">Сост.</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for it in vitems %}
-      {% set cl = {'ok':'', 'warn':'c-warn', 'bad':'c-bad'} %}
-      <tr>
-        <td class="mono muted {{ cl[it.hs_st] }}" {% if it.hs_ref %}title="В справочнике: {{ it.hs_ref }}"{% endif %}>{{ it.hs_code }}</td>
-        <td class="mono">{{ it.item_code }}</td>
-        <td class="mono muted {{ cl[it.ean_st] }}">{{ it.barcode or "—" }}</td>
-        <td class="nm-ru {{ cl[it.rus_st] }}">{{ it.name }}</td>
-        <td class="muted">{{ it.name_en or "—" }}</td>
-        <td class="{{ cl[it.origin_st] }}">{{ it.origin or "—" }}</td>
-        <td class="{{ cl[it.prod_st] }}">{{ it.producer or "—" }}</td>
-        <td class="num">{{ it.qty }}</td>
-        <td class="num">{{ it.unit_price }}</td>
-        <td class="num">{{ it.total_price }}</td>
-        <td class="num">{{ it.net_weight or "—" }}</td>
-        <td class="num">{{ it.gross_weight or "—" }}</td>
-        <td class="num">{{ it.box_count or "—" }}</td>
-        <td class="num">{{ it.set_count or "1" }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-    <tfoot>
-      <tr>
-        <td colspan="7">Итого</td>
-        <td class="num">{{ totals.qty }}</td>
-        <td></td>
-        <td class="num">{{ totals.total_price }}</td>
-        <td class="num">{{ totals.net }}</td>
-        <td class="num">{{ totals.gross }}</td>
-        <td class="num">{{ totals.boxes }}</td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
-  </div>
-  {% else %}
-  <p class="empty">Товаров нет. Нажми «Изменить таблицу», чтобы добавить вручную, или загрузи Excel.</p>
-  {% endif %}
-  </div>{# /goods-read #}
-
-  <form id="goods-edit" method="post" action="/invoices/{{ invoice.id }}/items" style="display:none; margin-top:12px">
-    <p class="ed-hint">Правь ячейки прямо здесь. Можно вставить данные из Excel: скопируй диапазон в Excel
-       и вставь (Ctrl+V) в нужную ячейку — заполнится сразу несколько ячеек и строк.</p>
+  <form id="goods-edit" method="post" action="/invoices/{{ invoice.id }}/items" style="margin-top:12px">
+    <p class="ed-hint">Правь ячейки прямо здесь — изменения сохраняются по кнопке «Сохранить».
+       Можно вставить данные из Excel: скопируй диапазон и вставь (Ctrl+V) в нужную ячейку —
+       заполнится сразу несколько ячеек и строк. Столбец «Производитель» заполняется из справочника.</p>
     <div class="scroll-x" style="border:none"><div id="goods-editor"></div></div>
     <input type="hidden" name="data" id="goods-data">
-    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+    <div class="ed-hint" style="margin-top:8px">Итого: кол-во {{ totals.qty }} · сумма {{ totals.total_price }}
+       · нетто {{ totals.net }} · брутто {{ totals.gross }} · коробки {{ totals.boxes }}</div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
       <button class="btn sm ghost" type="button" onclick="addGoodRow()">+ строка</button>
       <span style="flex:1"></span>
       <button class="btn sm" type="submit" onclick="return collectGoods()">Сохранить</button>
-      <button class="btn sm ghost" type="button" onclick="cancelEditGoods()">Отмена</button>
     </div>
   </form>
+  </div>{# /card-body #}
 </div>
 
 <script id="goods-json" type="application/json">{{ items_json|safe }}</script>
 <script>
+// ro — столбец только для чтения (производитель из справочника);
+// st — ключ статуса сверки для подсветки ячейки; ref — подсказка «в справочнике».
 const GOODS_COLS=[
-  {k:'hs_code',l:'ТН ВЭД'},{k:'item_code',l:'Артикул'},{k:'barcode',l:'EAN'},
-  {k:'name',l:'Наименование (рус)',wide:true},{k:'name_en',l:'Название (англ)',wide:true},{k:'origin',l:'Страна'},
+  {k:'hs_code',l:'ТН ВЭД',st:'hs_st',ref:'hs_ref'},
+  {k:'item_code',l:'Артикул'},
+  {k:'barcode',l:'EAN',st:'ean_st'},
+  {k:'name',l:'Наименование (рус)',wide:true,st:'rus_st'},
+  {k:'name_en',l:'Название (англ)',wide:true},
+  {k:'origin',l:'Страна',st:'origin_st'},
+  {k:'producer',l:'Производитель',ro:true,st:'prod_st'},
   {k:'qty',l:'Кол-во'},{k:'unit_price',l:'Цена'},{k:'total_price',l:'Сумма'},
   {k:'net_weight',l:'Нетто'},{k:'gross_weight',l:'Брутто'},{k:'box_count',l:'Коробки'},
-  {k:'set_count',l:'Кол-во сост.'}
+  {k:'set_count',l:'Сост.'}
 ];
 let GOODS_DATA=[];
 try{ GOODS_DATA=JSON.parse(document.getElementById('goods-json').textContent||'[]'); }catch(e){ GOODS_DATA=[]; }
 
 function _val(s){ return (s==null?'':String(s)); }
+function _esc(s){ return _val(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function _cls(st){ return st==='bad'?'c-bad':(st==='warn'?'c-warn':''); }
 
 function appendRow(body,row){
   const tr=document.createElement('tr');
   let html='<td class="rowdel" title="удалить строку" onclick="this.parentElement.remove()">✕</td>';
-  GOODS_COLS.forEach((c,ci)=>{
-    const v=_val(row[c.k]).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-    html+='<td><input data-c="'+ci+'" class="'+(c.wide?'wide':'')+'" value="'+v+'"></td>';
+  GOODS_COLS.forEach(c=>{
+    const st=c.st?_cls(row[c.st]):'';
+    const title=(c.ref&&row[c.ref])?(' title="В справочнике: '+_esc(row[c.ref])+'"'):'';
+    if(c.ro){
+      html+='<td class="ro '+st+'"'+title+'>'+(_esc(row[c.k])||'—')+'</td>';
+    }else{
+      html+='<td class="'+st+'"'+title+'><input data-k="'+c.k+'" class="'+(c.wide?'wide':'')+'" value="'+_esc(row[c.k])+'"></td>';
+    }
   });
   tr.innerHTML=html;
   body.appendChild(tr);
@@ -221,45 +193,41 @@ function buildGoodsEditor(){
     const text=(e.clipboardData||window.clipboardData).getData('text');
     if(!/[\t\n]/.test(text)) return;           // одиночное значение — обычная вставка
     e.preventDefault();
-    const startC=+inp.dataset.c;
-    const rows=text.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(r=>r.split('\t'));
     let tr=inp.closest('tr');
+    const startIdx=[...tr.querySelectorAll('input')].indexOf(inp);
+    const rows=text.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(r=>r.split('\t'));
     rows.forEach(cells=>{
       if(!tr) tr=addGoodRow();
       const inputs=tr.querySelectorAll('input');
-      cells.forEach((val,ci)=>{ const t=inputs[startC+ci]; if(t) t.value=val; });
+      cells.forEach((val,ci)=>{ const t=inputs[startIdx+ci]; if(t) t.value=val; });
       tr=tr.nextElementSibling;
     });
   });
 }
 
-function startEditGoods(){
-  buildGoodsEditor();
-  document.getElementById('goods-read').style.display='none';
-  document.getElementById('goods-edit').style.display='block';
-}
-function cancelEditGoods(){
-  document.getElementById('goods-edit').style.display='none';
-  document.getElementById('goods-read').style.display='';
-}
 function collectGoods(){
   const rows=[];
   document.querySelectorAll('#ged-body tr').forEach(tr=>{
     const o={};
-    tr.querySelectorAll('input').forEach(inp=>{ o[GOODS_COLS[+inp.dataset.c].k]=inp.value; });
+    tr.querySelectorAll('input[data-k]').forEach(inp=>{ o[inp.dataset.k]=inp.value; });
     rows.push(o);
   });
   document.getElementById('goods-data').value=JSON.stringify(rows);
   return true;
 }
+
+buildGoodsEditor();
 </script>
 
 {% if kits %}
-<div class="card">
-  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
-    <h2 style="margin:0">Разбивка наборов <span class="muted" style="font-weight:500">({{ kits|length }})</span></h2>
+<div class="card collapsible" id="card-kits">
+  <div class="card-head">
+    <span class="chev">▾</span>
+    <h2>Разбивка наборов <span class="cnt">({{ kits|length }})</span></h2>
+    <span class="tag-collapsed">— нажми, чтобы раскрыть</span>
     <a class="btn sm" style="margin-left:auto" href="/invoices/{{ invoice.id }}/razbivka.xlsx">⬇️ Скачать разбивку (Excel)</a>
   </div>
+  <div class="card-body">
   <p class="ed-hint">Для позиций, где «Сост.» &gt; 1. Данные набора объединены; заполни
      код и наименование составляющих (и при необходимости декларацию/ЭЗ/спирт), затем «Сохранить».</p>
   <form id="kit-form" method="post" action="/invoices/{{ invoice.id }}/kit">
@@ -298,6 +266,7 @@ function collectGoods(){
     <input type="hidden" name="data" id="kit-data">
     <button class="btn sm" type="submit" onclick="return collectKit()" style="margin-top:12px">Сохранить разбивку</button>
   </form>
+  </div>{# /card-body #}
 </div>
 <script>
 function collectKit(){
