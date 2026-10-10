@@ -135,9 +135,9 @@
     /* полосатая таблица товаров + итоги + мягкая сетка ячеек */
     table.striped tbody tr:nth-child(odd){background:#fafbfd}
     table.striped tbody tr:hover{background:#eef4ff}
-    table.striped th, table.striped td{border-right:1px solid #edf0f4}
+    table.striped th, table.striped td{border-right:1px solid #e7ebf0}
     table.striped th:last-child, table.striped td:last-child{border-right:none}
-    table.striped tbody td{border-bottom:1px solid #edf0f4; vertical-align:top}
+    table.striped tbody td{border-bottom:1px solid #e7ebf0; vertical-align:top}
     table.striped tfoot td{font-weight:700; border-top:2px solid #cfd6df;
       border-bottom:none; padding:13px 12px; background:#f1f4f8}
     /* колонки таблицы товаров */
@@ -159,11 +159,11 @@
     .ed-grid .rowdel{color:var(--danger); cursor:pointer; text-align:center; font-weight:700; user-select:none}
     .ed-hint{color:var(--muted); font-size:12.5px; margin:8px 0}
 
-    /* данные инвойса — таблица с ячейками */
+    /* данные инвойса — таблица с ячейками (единый стиль с таблицей товаров) */
     table.info{width:100%; border-collapse:collapse; border:1px solid var(--line);
-      border-radius:10px; overflow:hidden}
-    table.info td{border:1px solid #e9edf2; padding:11px 13px; font-size:14px; vertical-align:top}
-    table.info td.k{background:#f6f8fb; color:#525c6b; width:190px; white-space:nowrap}
+      border-radius:11px; overflow:hidden}
+    table.info td{border:1px solid #e7ebf0; padding:12px 13px; font-size:14px; vertical-align:top}
+    table.info td.k{background:#eef2f7; color:#525c6b; width:190px; white-space:nowrap}
     table.info td.v{color:var(--ink)}
     @media(max-width:620px){
       table.info td.k{width:140px; white-space:normal}
