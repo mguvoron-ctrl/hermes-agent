@@ -141,6 +141,22 @@ def init_db() -> None:
             updated_at  TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS kit_rows (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+            item_code  TEXT NOT NULL,     -- артикул набора
+            slot       INTEGER NOT NULL,  -- № составляющей (1..N)
+            comp_code  TEXT,  -- код составляющих
+            comp_name  TEXT,  -- наименование составляющих в наборе
+            decl       TEXT,  -- декларация соответствия
+            dfrom      TEXT,  -- От
+            dto        TEXT,  -- До
+            ez         TEXT,  -- ЭЗ
+            efrom      TEXT,  -- От (ЭЗ)
+            spirt      TEXT,  -- Спирт
+            UNIQUE (invoice_id, item_code, slot)
+        );
+
         CREATE TABLE IF NOT EXISTS article_ref (
             article    TEXT PRIMARY KEY,   -- нормализованный артикул
             hs_code    TEXT,               -- Код ТН ВЭД
@@ -391,6 +407,41 @@ def set_invoice_fields(invoice_id: int, fields: dict) -> None:
     conn = get_conn()
     conn.execute(f"UPDATE invoices SET {sets} WHERE id = ?",
                  (*cols.values(), invoice_id))
+    conn.commit()
+    conn.close()
+
+
+# --- Разбивка наборов ------------------------------------------------------
+KIT_FIELDS = ["comp_code", "comp_name", "decl", "dfrom", "dto", "ez", "efrom", "spirt"]
+
+
+def get_kit_rows(invoice_id: int) -> dict:
+    """Составляющие наборов: {(item_code, slot): row}."""
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM kit_rows WHERE invoice_id = ?", (invoice_id,)).fetchall()
+    conn.close()
+    return {(r["item_code"], r["slot"]): r for r in rows}
+
+
+def save_kit_rows(invoice_id: int, rows: list[dict]) -> None:
+    conn = get_conn()
+    for r in rows:
+        item = str(r.get("item_code", "")).strip()
+        try:
+            slot = int(r.get("slot"))
+        except (TypeError, ValueError):
+            continue
+        if not item or slot < 1:
+            continue
+        conn.execute(
+            """INSERT OR REPLACE INTO kit_rows
+               (id, invoice_id, item_code, slot, comp_code, comp_name, decl, dfrom, dto, ez, efrom, spirt)
+               VALUES ((SELECT id FROM kit_rows WHERE invoice_id=? AND item_code=? AND slot=?),
+                       ?,?,?,?,?,?,?,?,?,?,?)""",
+            (invoice_id, item, slot,
+             invoice_id, item, slot,
+             *(str(r.get(k, "") or "").strip() for k in KIT_FIELDS)),
+        )
     conn.commit()
     conn.close()
 

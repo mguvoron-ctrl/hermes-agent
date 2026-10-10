@@ -254,6 +254,65 @@ function collectGoods(){
 }
 </script>
 
+{% if kits %}
+<div class="card">
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+    <h2 style="margin:0">Разбивка наборов <span class="muted" style="font-weight:500">({{ kits|length }})</span></h2>
+    <a class="btn sm" style="margin-left:auto" href="/invoices/{{ invoice.id }}/razbivka.xlsx">⬇️ Скачать разбивку (Excel)</a>
+  </div>
+  <p class="ed-hint">Для позиций, где «Сост.» &gt; 1. Данные набора объединены; заполни
+     код и наименование составляющих (и при необходимости декларацию/ЭЗ/спирт), затем «Сохранить».</p>
+  <form id="kit-form" method="post" action="/invoices/{{ invoice.id }}/kit">
+    <div class="scroll-x">
+    <table class="ed-grid">
+      <thead><tr>
+        <th>ТН ВЭД</th><th>Артикул</th><th>Наименование</th><th>Описание (рус)</th>
+        <th>Код сост.</th><th>Наименование сост.</th><th>Декларация</th><th>От</th><th>До</th><th>ЭЗ</th><th>От</th><th>Спирт</th><th>EAN набора</th>
+      </tr></thead>
+      <tbody>
+      {% for k in kits %}
+        {% for row in k.rows %}
+        <tr>
+          {% if loop.first %}
+          <td rowspan="{{ k.n }}" class="mono" style="vertical-align:middle">{{ k.hs_code }}</td>
+          <td rowspan="{{ k.n }}" class="mono" style="vertical-align:middle">{{ k.item_code }}</td>
+          <td rowspan="{{ k.n }}" style="vertical-align:middle">{{ k.name_en }}</td>
+          <td rowspan="{{ k.n }}" style="vertical-align:middle">{{ k.name }}</td>
+          {% endif %}
+          {% set di = 'data-item="' ~ k.item_code ~ '" data-slot="' ~ row.slot ~ '"' %}
+          <td><input data-f="comp_code"  {{ di|safe }} value="{{ row.comp_code }}"></td>
+          <td><input class="wide" data-f="comp_name" {{ di|safe }} value="{{ row.comp_name }}"></td>
+          <td><input data-f="decl"  {{ di|safe }} value="{{ row.decl }}"></td>
+          <td><input data-f="dfrom" {{ di|safe }} value="{{ row.dfrom }}" style="min-width:70px"></td>
+          <td><input data-f="dto"   {{ di|safe }} value="{{ row.dto }}" style="min-width:70px"></td>
+          <td><input data-f="ez"    {{ di|safe }} value="{{ row.ez }}" style="min-width:70px"></td>
+          <td><input data-f="efrom" {{ di|safe }} value="{{ row.efrom }}" style="min-width:70px"></td>
+          <td><input data-f="spirt" {{ di|safe }} value="{{ row.spirt }}" style="min-width:60px"></td>
+          {% if loop.first %}<td rowspan="{{ k.n }}" class="mono" style="vertical-align:middle">{{ k.barcode }}</td>{% endif %}
+        </tr>
+        {% endfor %}
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <input type="hidden" name="data" id="kit-data">
+    <button class="btn sm" type="submit" onclick="return collectKit()" style="margin-top:12px">Сохранить разбивку</button>
+  </form>
+</div>
+<script>
+function collectKit(){
+  const rows={};
+  document.querySelectorAll('#kit-form input[data-f]').forEach(function(inp){
+    const key=inp.getAttribute('data-item')+'||'+inp.getAttribute('data-slot');
+    if(!rows[key]) rows[key]={item_code:inp.getAttribute('data-item'), slot:+inp.getAttribute('data-slot')};
+    rows[key][inp.getAttribute('data-f')]=inp.value;
+  });
+  document.getElementById('kit-data').value=JSON.stringify(Object.values(rows));
+  return true;
+}
+</script>
+{% endif %}
+
 <div class="card">
   <h2>Этапы процесса</h2>
   {% for s in steps %}

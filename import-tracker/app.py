@@ -274,6 +274,7 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
     items = db.get_items(invoice_id)
     totals = _item_totals(items)
     vitems, vsummary = validate_items(items)
+    kits = _build_kits(invoice_id, items)
     items_json = json.dumps(
         [{k: (it[k] or "") for k in ITEM_FIELDS} for it in items],
         ensure_ascii=False,
@@ -286,7 +287,7 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
             "files_by_step": files_by_step, "progress": db.progress(invoice_id),
             "statuses": db.STATUSES, "items": items, "totals": totals,
             "vitems": vitems, "vsummary": vsummary, "camion_updated": camion,
-            "items_json": items_json, "nav": "invoices",
+            "kits": kits, "items_json": items_json, "nav": "invoices",
         },
     )
 
@@ -404,6 +405,33 @@ def _fmt_num(x: float) -> str:
     return f"{x:,.2f}".replace(",", " ")
 
 
+def _set_count(v) -> int:
+    try:
+        return int(float(str(v or "1").replace(",", ".")))
+    except (ValueError, TypeError):
+        return 1
+
+
+def _build_kits(invoice_id: int, items) -> list:
+    """Разбивка: для товаров с «Кол-во сост.» > 1 — блок из N строк составляющих."""
+    kitmap = db.get_kit_rows(invoice_id)
+    kits = []
+    for it in items:
+        n = _set_count(it["set_count"])
+        if n <= 1:
+            continue
+        rows = []
+        for slot in range(1, n + 1):
+            ex = kitmap.get((it["item_code"], slot))
+            rows.append({"slot": slot, **{k: (ex[k] if ex else "") for k in db.KIT_FIELDS}})
+        kits.append({
+            "hs_code": it["hs_code"], "item_code": it["item_code"],
+            "name_en": it["name_en"] or "", "name": it["name"] or "",
+            "barcode": it["barcode"] or "", "n": n, "rows": rows,
+        })
+    return kits
+
+
 def _item_totals(items) -> dict:
     return {
         "qty": _fmt_num(sum(_num(it["qty"]) for it in items)),
@@ -412,6 +440,36 @@ def _item_totals(items) -> dict:
         "gross": _fmt_num(sum(_num(it["gross_weight"]) for it in items)),
         "boxes": _fmt_num(sum(_num(it["box_count"]) for it in items)),
     }
+
+
+@app.post("/invoices/{invoice_id}/kit")
+def save_kit(request: Request, invoice_id: int, data: str = Form(...),
+             user=Depends(require_user)):
+    """Сохранить составляющие наборов (разбивку)."""
+    try:
+        rows = json.loads(data)
+    except (ValueError, TypeError):
+        rows = []
+    db.save_kit_rows(invoice_id, rows if isinstance(rows, list) else [])
+    return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
+
+
+@app.get("/invoices/{invoice_id}/razbivka.xlsx")
+def export_razbivka(request: Request, invoice_id: int, user=Depends(require_user)):
+    """Разбивка наборов в Excel (формат листа «Разбивка»)."""
+    from urllib.parse import quote
+    import razbivka_export
+    invoice = db.get_invoice(invoice_id)
+    if not invoice:
+        raise HTTPException(404, "Инвойс не найден")
+    kits = _build_kits(invoice_id, db.get_items(invoice_id))
+    content = razbivka_export.build_razbivka_xlsx(kits)
+    fname = f"Разбивка_{invoice['number']}.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
+    )
 
 
 @app.post("/invoices/{invoice_id}/steps/{step_id}")
