@@ -60,19 +60,27 @@
 
 <div class="card">
   <h2>Данные инвойса</h2>
-  <div class="kv2">
-    <div class="pair full"><span class="k">Поставщик</span><span>{{ invoice.supplier or "—" }}</span></div>
-    <div class="pair"><span class="k">Дата инвойса</span><span>{{ invoice.inv_date or "—" }}</span></div>
-    <div class="pair"><span class="k">Валюта</span><span>{{ invoice.currency or "—" }}</span></div>
-    <div class="pair"><span class="k">Условия поставки</span><span>{{ invoice.incoterms or "—" }}</span></div>
-    <div class="pair"><span class="k">Сумма к оплате</span><span><b>{{ invoice.amount or "—" }}</b> {{ invoice.currency or "" }}</span></div>
-    <div class="pair"><span class="k">№ упаковочного листа</span><span>{{ invoice.packing_list_no or "—" }}</span></div>
-    <div class="pair"><span class="k">Паллеты / коробки</span><span>{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</span></div>
-    <div class="pair"><span class="k">Вес нетто / брутто</span><span>{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }} кг</span></div>
-    <div class="pair"><span class="k">ИНН получателя</span><span>{{ invoice.inn or "—" }}</span></div>
-    <div class="pair full"><span class="k">Получатель</span><span>{{ invoice.consignee or "—" }}</span></div>
-    <div class="pair full"><span class="k">Контракт</span><span>{{ invoice.contract or "—" }}</span></div>
-  </div>
+  <table class="info">
+    <tr><td class="k">Поставщик</td><td class="v" colspan="3">{{ invoice.supplier or "—" }}</td></tr>
+    <tr>
+      <td class="k">Дата инвойса</td><td class="v">{{ invoice.inv_date or "—" }}</td>
+      <td class="k">Валюта</td><td class="v">{{ invoice.currency or "—" }}</td>
+    </tr>
+    <tr>
+      <td class="k">Условия поставки</td><td class="v">{{ invoice.incoterms or "—" }}</td>
+      <td class="k">Сумма к оплате</td><td class="v">{{ invoice.amount or "—" }} {{ invoice.currency or "" }}</td>
+    </tr>
+    <tr>
+      <td class="k">№ упаковочного листа</td><td class="v">{{ invoice.packing_list_no or "—" }}</td>
+      <td class="k">Паллеты / коробки</td><td class="v">{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</td>
+    </tr>
+    <tr>
+      <td class="k">Вес нетто / брутто</td><td class="v">{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }} кг</td>
+      <td class="k">ИНН получателя</td><td class="v">{{ invoice.inn or "—" }}</td>
+    </tr>
+    <tr><td class="k">Получатель</td><td class="v" colspan="3">{{ invoice.consignee or "—" }}</td></tr>
+    <tr><td class="k">Контракт</td><td class="v" colspan="3">{{ invoice.contract or "—" }}</td></tr>
+  </table>
 </div>
 
 <div class="card" id="goods-card">

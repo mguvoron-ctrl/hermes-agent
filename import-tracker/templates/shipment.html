@@ -3,12 +3,16 @@
 {% block content %}
 <p class="crumbs"><a href="/">Поставки</a> · Поставка {{ shipment.number }}</p>
 <h1>Поставка {{ shipment.number }}</h1>
-{% if shipment.title %}<p class="sub">{{ shipment.title }}</p>{% endif %}
+<p class="sub">
+  {% if shipment.title %}{{ shipment.title }} · {% endif %}
+  В одной поставке может быть несколько инвойсов. Добавляй их сюда — по одному.
+</p>
 
 <div class="card" style="border-color:#d3dffb; background:#f6f9ff">
-  <h2>📥 Загрузить инвойс из Excel</h2>
+  <h2>📥 Добавить инвойс из Excel</h2>
   <p class="muted" style="margin-top:-6px">Присланный поставщиком файл (FAC-IN / Packing list / Перевод).
-     Система сама создаст инвойс, заполнит поля, товары и сохранит оригинал.</p>
+     Система сама создаст инвойс, заполнит поля, товары и сохранит оригинал.
+     Чтобы добавить ещё один инвойс — загрузи следующий файл.</p>
   <form method="post" action="/shipments/{{ shipment.id }}/import"
         enctype="multipart/form-data" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
     <input type="file" name="f" accept=".xlsx,.xlsm" required style="flex:1; min-width:220px">
@@ -17,7 +21,26 @@
 </div>
 
 <div class="card">
-  <h2>Инвойсы поставки</h2>
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+    <h2 style="margin:0">Инвойсы в этой поставке <span class="muted" style="font-weight:500">({{ rows|length }})</span></h2>
+    <button class="btn sm ghost" type="button" style="margin-left:auto"
+            onclick="document.getElementById('man').classList.toggle('open')">+ Добавить вручную (без Excel)</button>
+  </div>
+
+  <form id="man" class="edit" method="post" action="/shipments/{{ shipment.id }}/invoices"
+        style="margin-top:12px; display:none">
+    <div class="row">
+      <div style="flex:0 0 180px"><label class="lbl">Номер инвойса *</label><input type="text" name="number" required></div>
+      <div><label class="lbl">Поставщик</label><input type="text" name="supplier"></div>
+      <div style="flex:0 0 150px"><label class="lbl">Сумма</label><input type="text" name="amount"></div>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:8px">
+      <button class="btn sm" type="submit">Добавить инвойс</button>
+      <button class="btn sm ghost" type="button" onclick="document.getElementById('man').classList.remove('open')">Отмена</button>
+    </div>
+  </form>
+
+  <div style="margin-top:14px">
   {% if rows %}
   <div class="scroll-x">
   <table>
@@ -47,27 +70,6 @@
   {% else %}
   <p class="empty">В этой поставке пока нет инвойсов. Загрузи первый из Excel ↑</p>
   {% endif %}
-</div>
-
-<div class="card">
-  <h2>…или добавить инвойс вручную</h2>
-  <form method="post" action="/shipments/{{ shipment.id }}/invoices">
-    <div class="row">
-      <div style="flex:0 0 180px">
-        <label class="lbl">Номер инвойса *</label>
-        <input type="text" name="number" required>
-      </div>
-      <div>
-        <label class="lbl">Поставщик</label>
-        <input type="text" name="supplier">
-      </div>
-      <div style="flex:0 0 150px">
-        <label class="lbl">Сумма</label>
-        <input type="text" name="amount">
-      </div>
-    </div>
-    <div style="height:12px"></div>
-    <button class="btn ghost" type="submit">Добавить вручную</button>
-  </form>
+  </div>
 </div>
 {% endblock %}
