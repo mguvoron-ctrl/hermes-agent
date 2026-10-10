@@ -164,6 +164,23 @@
     .ed-grid .rowdel{color:var(--danger); cursor:pointer; text-align:center; font-weight:700; user-select:none}
     .ed-hint{color:var(--muted); font-size:12.5px; margin:8px 0}
 
+    /* плитки источников справочника */
+    .tiles{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px}
+    .tile{display:block; background:#fff; border:1px solid var(--line); border-radius:14px;
+      padding:16px 18px; text-decoration:none; color:var(--ink); box-shadow:var(--shadow);
+      transition:transform .12s, box-shadow .12s, border-color .12s; position:relative; overflow:hidden}
+    .tile:hover{transform:translateY(-3px); box-shadow:0 8px 20px rgba(20,30,50,.10);
+      border-color:#c6d4f5; text-decoration:none}
+    .tile.active{border-color:var(--accent); background:linear-gradient(180deg,#f3f7ff,#fff)}
+    .tile .nm{display:flex; align-items:center; gap:7px; font-weight:650; font-size:14.5px}
+    .tile .nm .ic{font-size:18px}
+    .tile .num{font-size:30px; font-weight:800; letter-spacing:-.02em; margin-top:10px; line-height:1}
+    .tile .cnt{color:var(--muted); font-size:12.5px; margin-top:3px}
+    .tile.transit{background:linear-gradient(180deg,#fff8e6,#fff); border-color:#f0e2b8}
+    .tile.transit.active{background:linear-gradient(180deg,#fdf0c8,#fff)}
+    .tile .bar{position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--accent)}
+    .tile.transit .bar{background:#e0a92b}
+
     /* данные инвойса — таблица с ячейками (единый стиль с таблицей товаров) */
     table.info{width:100%; border-collapse:collapse; border:1px solid var(--line);
       border-radius:11px; overflow:hidden; table-layout:fixed}

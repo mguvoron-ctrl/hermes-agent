@@ -10,14 +10,24 @@
 
 <div class="card">
   <h2>Что лежит в справочнике — нажми, чтобы открыть</h2>
-  <div style="display:flex; gap:8px; flex-wrap:wrap">
-    <a class="btn {{ '' if source=='transit' else 'ghost' }}" href="/references?source=transit">📒 TRANSIT · {{ brands.transit }}</a>
+  <div class="tiles">
+    <a class="tile transit {{ 'active' if source=='transit' and not brand else '' }}" href="/references?source=transit">
+      <span class="bar"></span>
+      <div class="nm"><span class="ic">📒</span> TRANSIT</div>
+      <div class="num">{{ brands.transit }}</div>
+      <div class="cnt">артикулов · все поставки</div>
+    </a>
     {% for b in brands.novinki %}
-      <a class="btn {{ '' if brand==b.name else 'ghost' }}" href="/references?brand={{ b.name|urlencode }}">🆕 {{ b.name }} · {{ b.c }}</a>
+    <a class="tile {{ 'active' if brand==b.name else '' }}" href="/references?brand={{ b.name|urlencode }}">
+      <span class="bar"></span>
+      <div class="nm"><span class="ic">🆕</span> {{ b.name }}</div>
+      <div class="num">{{ b.c }}</div>
+      <div class="cnt">новых артикулов</div>
+    </a>
     {% endfor %}
   </div>
-  <p class="muted" style="margin-top:12px; margin-bottom:0">
-    🆕 Новинки показывают артикулы, которых нет в TRANSIT. Числа — сколько артикулов.
+  <p class="muted" style="margin-top:14px; margin-bottom:0">
+    🆕 Новинки показывают артикулы, которых нет в TRANSIT.
   </p>
 </div>
 
