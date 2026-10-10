@@ -7,9 +7,11 @@ echo    Трекер поставок — запуск
 echo ============================================
 echo.
 
-rem --- 1) Ищем Python ---
+rem --- 1) Ищем Python (предпочитаем стабильную 3.13, затем 3.12) ---
 set "PY="
-where py >nul 2>nul && set "PY=py"
+py -3.13 --version >nul 2>nul && set "PY=py -3.13"
+if not defined PY ( py -3.12 --version >nul 2>nul && set "PY=py -3.12" )
+if not defined PY ( where py >nul 2>nul && set "PY=py" )
 if not defined PY (
   where python >nul 2>nul && set "PY=python"
 )
