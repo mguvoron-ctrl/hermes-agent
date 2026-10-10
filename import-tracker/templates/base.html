@@ -51,11 +51,11 @@
     /* таблицы */
     table{width:100%; border-collapse:collapse; font-size:14px}
     thead th{
-      text-align:left; color:var(--muted); font-weight:600; font-size:11.5px;
-      text-transform:uppercase; letter-spacing:.04em; padding:8px 12px;
-      border-bottom:1px solid var(--line); white-space:nowrap;
+      text-align:left; color:#525c6b; font-weight:700; font-size:11.5px;
+      text-transform:uppercase; letter-spacing:.04em; padding:12px 12px;
+      background:#eef2f7; border-bottom:2px solid #d7dde6; white-space:nowrap;
     }
-    tbody td{padding:11px 12px; border-bottom:1px solid var(--line2); vertical-align:middle}
+    tbody td{padding:12px; border-bottom:1px solid var(--line2); vertical-align:middle}
     tbody tr:last-child td{border-bottom:none}
     tr.clickable{cursor:pointer}
     tr.clickable:hover{background:#fafbfe}
@@ -107,7 +107,8 @@
     .kv .k{color:var(--muted)}
     @media(max-width:560px){ .kv{grid-template-columns:1fr} .kv .k{padding-bottom:0} }
 
-    .scroll-x{overflow-x:auto; margin:0 -4px}
+    .scroll-x{overflow-x:auto; border:1px solid var(--line); border-radius:11px}
+    .scroll-x table{margin:0}
 
     /* матрица этапов */
     .matrix{font-size:13px}
