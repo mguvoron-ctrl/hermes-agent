@@ -445,6 +445,20 @@ def get_file(file_id: int):
     return row
 
 
+def delete_step_files(step_id: int) -> None:
+    """Удаляет все файлы, привязанные к шагу (и с диска)."""
+    conn = get_conn()
+    rows = conn.execute("SELECT stored_path FROM files WHERE step_id = ?", (step_id,)).fetchall()
+    for r in rows:
+        try:
+            os.remove(r["stored_path"])
+        except OSError:
+            pass
+    conn.execute("DELETE FROM files WHERE step_id = ?", (step_id,))
+    conn.commit()
+    conn.close()
+
+
 def delete_file(file_id: int) -> None:
     conn = get_conn()
     row = conn.execute("SELECT stored_path FROM files WHERE id = ?", (file_id,)).fetchone()

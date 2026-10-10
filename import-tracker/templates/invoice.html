@@ -19,7 +19,7 @@
   {% else %}
     <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap">
       <div>
-        <div class="muted" style="font-size:12.5px; margin-bottom:4px">СЕЙЧАС НА ЭТАПЕ</div>
+        <div class="muted" style="font-size:12px; margin-bottom:4px">СЕЙЧАС НА ЭТАПЕ</div>
         <span class="badge accent" style="font-size:14px">{{ progress.current }}</span>
       </div>
       <div style="flex:1; min-width:160px">
@@ -32,20 +32,47 @@
   {% endif %}
 </div>
 
+{# --- Исходный Excel (один файл: Инвойс + Пакинг лист + Перевод) --- #}
+<div class="card" style="border-color:#d3dffb; background:#f8faff">
+  <h2>📄 Исходный Excel</h2>
+  <p class="muted" style="margin-top:-8px">Один файл содержит Инвойс, Пакинг лист и Перевод.
+     При замене данные и таблица товаров пересчитываются автоматически.</p>
+  {% set src = files_by_step.get(steps[0].id, []) if steps else [] %}
+  {% if src %}
+    {% for f in src %}
+    <div class="step-file">📎 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>
+      <span class="muted">· загружен {{ f.uploaded_at }}</span></div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">Файл ещё не загружен.</p>
+  {% endif %}
+  <button class="btn sm" style="margin-top:10px" onclick="document.getElementById('reimp').classList.toggle('open')">
+    {% if src %}Заменить файл и обновить данные{% else %}Загрузить Excel{% endif %}
+  </button>
+  <form id="reimp" class="edit" method="post" action="/invoices/{{ invoice.id }}/reimport"
+        enctype="multipart/form-data"
+        style="margin-top:10px; display:none; gap:8px; align-items:center; flex-wrap:wrap">
+    <input type="file" name="f" accept=".xlsx,.xlsm" required style="flex:1; min-width:200px">
+    <button class="btn sm" type="submit">Сохранить</button>
+    <button class="btn sm ghost" type="button"
+            onclick="document.getElementById('reimp').classList.remove('open')">Отмена</button>
+  </form>
+</div>
+
 <div class="card">
   <h2>Данные инвойса</h2>
-  <div class="kv">
-    <div><span class="k">Поставщик</span></div><div>{{ invoice.supplier or "—" }}</div>
-    <div><span class="k">Дата инвойса</span></div><div>{{ invoice.inv_date or "—" }}</div>
-    <div><span class="k">Условия поставки</span></div><div>{{ invoice.incoterms or "—" }}</div>
-    <div><span class="k">Валюта</span></div><div>{{ invoice.currency or "—" }}</div>
-    <div><span class="k">Сумма к оплате</span></div><div><b>{{ invoice.amount or "—" }}</b> {{ invoice.currency or "" }}</div>
-    <div><span class="k">Контракт</span></div><div>{{ invoice.contract or "—" }}</div>
-    <div><span class="k">Получатель</span></div><div>{{ invoice.consignee or "—" }}{% if invoice.inn %} <span class="muted">(ИНН {{ invoice.inn }})</span>{% endif %}</div>
-    <div><span class="k">№ упаковочного листа</span></div><div>{{ invoice.packing_list_no or "—" }}</div>
-    <div><span class="k">Паллеты / коробки</span></div><div>{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</div>
-    <div><span class="k">Вес нетто / брутто, кг</span></div><div>{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }}</div>
-    {% if invoice.source_file %}<div><span class="k">Файл-источник</span></div><div class="muted">{{ invoice.source_file }}</div>{% endif %}
+  <div class="kv2">
+    <div class="pair full"><span class="k">Поставщик</span><span>{{ invoice.supplier or "—" }}</span></div>
+    <div class="pair"><span class="k">Дата инвойса</span><span>{{ invoice.inv_date or "—" }}</span></div>
+    <div class="pair"><span class="k">Валюта</span><span>{{ invoice.currency or "—" }}</span></div>
+    <div class="pair"><span class="k">Условия поставки</span><span>{{ invoice.incoterms or "—" }}</span></div>
+    <div class="pair"><span class="k">Сумма к оплате</span><span><b>{{ invoice.amount or "—" }}</b> {{ invoice.currency or "" }}</span></div>
+    <div class="pair"><span class="k">№ упаковочного листа</span><span>{{ invoice.packing_list_no or "—" }}</span></div>
+    <div class="pair"><span class="k">Паллеты / коробки</span><span>{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</span></div>
+    <div class="pair"><span class="k">Вес нетто / брутто</span><span>{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }} кг</span></div>
+    <div class="pair"><span class="k">ИНН получателя</span><span>{{ invoice.inn or "—" }}</span></div>
+    <div class="pair full"><span class="k">Получатель</span><span>{{ invoice.consignee or "—" }}</span></div>
+    <div class="pair full"><span class="k">Контракт</span><span>{{ invoice.contract or "—" }}</span></div>
   </div>
 </div>
 
@@ -53,7 +80,7 @@
 <div class="card">
   <h2>Товары <span class="muted" style="font-weight:500">({{ items|length }})</span></h2>
   <div class="scroll-x">
-  <table>
+  <table class="striped">
     <thead>
       <tr>
         <th>ТН ВЭД</th><th>Артикул</th><th>Наименование</th>
@@ -78,6 +105,17 @@
       </tr>
     {% endfor %}
     </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3">Итого</td>
+        <td class="num">{{ totals.qty }}</td>
+        <td></td>
+        <td class="num">{{ totals.total_price }}</td>
+        <td class="num">{{ totals.net }}</td>
+        <td class="num">{{ totals.gross }}</td>
+        <td class="num">{{ totals.boxes }}</td>
+      </tr>
+    </tfoot>
   </table>
   </div>
 </div>
@@ -89,44 +127,56 @@
   {% set st = s.status %}
   {% set cls = 'ok' if st == 'готово' else ('work' if st == 'в работе' else 'wait') %}
   {% set is_current = (progress.current == s.name) %}
-  <div style="padding:13px 0; border-bottom:1px solid var(--line2); {% if is_current %}background:#f6f9ff; margin:0 -20px; padding-left:20px; padding-right:20px; border-bottom:none{% endif %}">
-    <div style="display:flex; align-items:center; gap:10px">
+  {% set from_excel = (s.position <= 2) %}
+  {% set sfiles = files_by_step.get(s.id, []) %}
+  <div class="step {{ 'current' if is_current else ('done' if st=='готово' else '') }}">
+    <div class="step-head">
       <span class="badge {{ cls }}">{{ '✓' if st=='готово' else ('●' if st=='в работе' else '○') }}</span>
-      <b>{{ s.position + 1 }}. {{ s.name }}</b>
+      <span class="nm">{{ s.position + 1 }}. {{ s.name }}</span>
       <span class="muted" style="font-size:12px">· {{ s.kind }}</span>
-    </div>
-
-    <form method="post" action="/invoices/{{ invoice.id }}/steps/{{ s.id }}"
-          style="margin-top:9px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
-      <select name="status" style="flex:0 0 150px">
-        {% for opt in statuses %}<option value="{{ opt }}" {{ 'selected' if opt==st else '' }}>{{ opt }}</option>{% endfor %}
-      </select>
-      <input type="text" name="note" placeholder="заметка (кому отправил, дата…)"
-             value="{{ s.note or '' }}" style="flex:1; min-width:180px">
-      <button class="btn sm" type="submit">Сохранить</button>
-    </form>
-
-    {% set sfiles = files_by_step.get(s.id, []) %}
-    {% if sfiles %}
-    <div style="margin-top:9px; display:flex; flex-direction:column; gap:4px">
-      {% for f in sfiles %}
-      <div style="font-size:13px">
-        📄 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>
-        <span class="muted">· {{ f.uploaded_at }}</span>
-        <form method="post" action="/files/{{ f.id }}/delete" style="display:inline">
-          <input type="hidden" name="invoice_id" value="{{ invoice.id }}">
-          <button class="btn sm danger" type="submit" onclick="return confirm('Удалить файл?')" style="padding:2px 8px">✕</button>
+      <span class="acts">
+        <button class="btn sm ghost" type="button" onclick="editStep({{ s.id }})">Изменить</button>
+        {% if sfiles and not from_excel %}
+        <form method="post" action="/invoices/{{ invoice.id }}/steps/{{ s.id }}/delfile" style="display:inline">
+          <button class="btn sm danger" type="submit" onclick="return confirm('Удалить файл этого этапа?')">Удалить</button>
         </form>
-      </div>
-      {% endfor %}
+        {% endif %}
+      </span>
     </div>
-    {% endif %}
 
-    <form method="post" action="/invoices/{{ invoice.id }}/files" enctype="multipart/form-data"
-          style="margin-top:7px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-      <input type="hidden" name="step_id" value="{{ s.id }}">
-      <input type="file" name="f" required style="flex:1; min-width:180px">
-      <button class="btn sm ghost" type="submit">Прикрепить к шагу</button>
+    {# режим просмотра #}
+    <div id="read-{{ s.id }}">
+      {% if s.note %}<div class="step-note"><span class="lab">заметка:</span> {{ s.note }}</div>{% endif %}
+      {% if from_excel %}
+        <div class="step-file muted">файл — в разделе «Исходный Excel» ↑</div>
+      {% elif sfiles %}
+        {% for f in sfiles %}
+        <div class="step-file">📎 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>
+          <span class="muted">· {{ f.uploaded_at }}</span></div>
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    {# режим редактирования #}
+    <form id="edit-{{ s.id }}" class="edit" method="post"
+          action="/invoices/{{ invoice.id }}/steps/{{ s.id }}" enctype="multipart/form-data">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+        <select name="status" style="flex:0 0 150px">
+          {% for opt in statuses %}<option value="{{ opt }}" {{ 'selected' if opt==st else '' }}>{{ opt }}</option>{% endfor %}
+        </select>
+        <input type="text" name="note" placeholder="заметка (кому отправил, дата…)"
+               value="{{ s.note or '' }}" style="flex:1; min-width:180px">
+      </div>
+      {% if not from_excel %}
+      <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <input type="file" name="f" style="flex:1; min-width:180px">
+        <span class="muted" style="font-size:12px">прикрепить файл этапа (необязательно)</span>
+      </div>
+      {% endif %}
+      <div style="margin-top:10px; display:flex; gap:8px">
+        <button class="btn sm" type="submit">Сохранить</button>
+        <button class="btn sm ghost" type="button" onclick="cancelStep({{ s.id }})">Отмена</button>
+      </div>
     </form>
   </div>
   {% endfor %}
@@ -156,4 +206,15 @@
     <p class="empty">Пока нет файлов без привязки к шагу.</p>
   {% endif %}
 </div>
+
+<script>
+function editStep(id){
+  document.getElementById('read-'+id).style.display='none';
+  document.getElementById('edit-'+id).classList.add('open');
+}
+function cancelStep(id){
+  document.getElementById('edit-'+id).classList.remove('open');
+  document.getElementById('read-'+id).style.display='';
+}
+</script>
 {% endblock %}

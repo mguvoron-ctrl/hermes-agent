@@ -124,6 +124,33 @@
     .cell.wait{color:#ccd2da; font-weight:400}
     .legend{display:flex; gap:18px; flex-wrap:wrap; color:var(--muted); font-size:12.5px; margin-top:12px}
     .legend span{display:inline-flex; align-items:center; gap:6px}
+
+    /* полосатая таблица товаров + итоги */
+    table.striped tbody tr:nth-child(odd){background:#fafbfd}
+    table.striped tbody tr:hover{background:#f2f6ff}
+    table.striped tfoot td{font-weight:700; border-top:2px solid var(--line);
+      border-bottom:none; padding:12px; background:#fbfcfe}
+
+    /* данные инвойса в две колонки */
+    .kv2{display:grid; grid-template-columns:repeat(2,1fr); gap:0 32px}
+    .kv2 .pair{display:grid; grid-template-columns:160px 1fr; gap:10px;
+      padding:10px 0; border-bottom:1px solid var(--line2)}
+    .kv2 .pair.full{grid-column:1 / -1}
+    .kv2 .k{color:var(--muted)}
+    @media(max-width:620px){ .kv2{grid-template-columns:1fr} }
+
+    /* карточки этапов */
+    .step{padding:12px 14px; border:1px solid var(--line); border-radius:11px; margin-bottom:9px}
+    .step.current{border-color:#c6d6ff; background:#f6f9ff}
+    .step.done{background:#fbfdfb}
+    .step-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+    .step-head .nm{font-weight:650}
+    .step-head .acts{margin-left:auto; display:flex; gap:6px}
+    .step-note{color:var(--ink); margin-top:6px; font-size:13.5px}
+    .step-note .lab{color:var(--muted)}
+    .step-file{margin-top:7px; font-size:13px}
+    .edit{margin-top:10px; display:none}
+    .edit.open{display:block}
   </style>
 </head>
 <body>

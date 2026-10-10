@@ -172,6 +172,39 @@ def _save_original(invoice_id: int, shipment, invoice, filename: str,
     db.add_file(invoice_id, step_id, filename, str(dest), len(data), uploaded_by)
 
 
+def _parse_xlsx(data: bytes) -> dict:
+    """Разбор Excel из байтов (openpyxl читает с диска → временный файл)."""
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = tmp.name
+    try:
+        return xlsx_import.parse_invoice(tmp_path)
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def _apply_parsed(invoice_id: int, shipment, invoice, parsed: dict,
+                  filename: str, data: bytes, user, replace_source: bool) -> None:
+    """Заполняет поля/товары, сохраняет исходный Excel, отмечает входящие этапы."""
+    fields = parsed["fields"]
+    db.set_invoice_fields(invoice_id, {**fields, "source_file": filename})
+    if parsed["items"]:
+        db.replace_items(invoice_id, parsed["items"])
+    steps = db.get_steps(invoice_id)
+    first = steps[0]["id"] if steps else None
+    if replace_source and first:
+        db.delete_step_files(first)  # убрать прежний исходник
+    if first:
+        _save_original(invoice_id, shipment, invoice, filename, data, first, user["name"])
+    # Инвойс + Пакинг лист + Перевод приходят в одном файле → отмечаем все три
+    for s in steps:
+        if s["kind"] == "входящий" and s["position"] <= 2:
+            db.update_step(s["id"], "готово", "получено из Excel-файла")
+
+
 @app.post("/shipments/{shipment_id}/import")
 async def import_invoice(request: Request, shipment_id: int,
                          f: UploadFile = File(...), user=Depends(require_user)):
@@ -181,27 +214,14 @@ async def import_invoice(request: Request, shipment_id: int,
         raise HTTPException(404, "Поставка не найдена")
 
     data = await f.read()
-    # openpyxl читает с диска — пишем во временный файл
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-        tmp.write(data)
-        tmp_path = tmp.name
-    try:
-        parsed = xlsx_import.parse_invoice(tmp_path)
-    finally:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-
-    fields = parsed["fields"]
-    number = fields.get("number") or os.path.splitext(f.filename)[0]
+    parsed = _parse_xlsx(data)
+    number = parsed["fields"].get("number") or os.path.splitext(f.filename)[0]
 
     try:
         invoice_id = db.create_invoice(shipment_id, number,
-                                       supplier=fields.get("supplier", ""),
-                                       amount=fields.get("amount", ""))
+                                       supplier=parsed["fields"].get("supplier", ""),
+                                       amount=parsed["fields"].get("amount", ""))
     except Exception:
-        # инвойс с таким номером уже есть — открываем существующий и обновляем
         existing = next((i for i in db.list_invoices(shipment_id)
                          if i["number"] == number), None)
         if not existing:
@@ -209,21 +229,23 @@ async def import_invoice(request: Request, shipment_id: int,
         invoice_id = existing["id"]
 
     invoice = db.get_invoice(invoice_id)
-    db.set_invoice_fields(invoice_id, {**fields, "source_file": f.filename})
-    if parsed["items"]:
-        db.replace_items(invoice_id, parsed["items"])
+    _apply_parsed(invoice_id, shipment, invoice, parsed, f.filename, data, user,
+                  replace_source=False)
+    return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
 
-    # сохранить оригинал (привязан к этапу «Инвойс»)
-    steps = db.get_steps(invoice_id)
-    first_step_id = steps[0]["id"] if steps else None
-    _save_original(invoice_id, shipment, invoice, f.filename, data,
-                   first_step_id, user["name"])
 
-    # авто-отметка: входящие документы (Инвойс, Пакинг лист, Перевод) пришли в этом файле
-    for s in steps:
-        if s["kind"] == "входящий" and s["position"] <= 2:
-            db.update_step(s["id"], "готово", "получено из Excel-файла")
-
+@app.post("/invoices/{invoice_id}/reimport")
+async def reimport_invoice(request: Request, invoice_id: int,
+                           f: UploadFile = File(...), user=Depends(require_user)):
+    """Заменить исходный Excel и ПЕРЕСЧИТАТЬ данные/товары инвойса."""
+    invoice = db.get_invoice(invoice_id)
+    if not invoice:
+        raise HTTPException(404, "Инвойс не найден")
+    shipment = db.get_shipment(invoice["shipment_id"])
+    data = await f.read()
+    parsed = _parse_xlsx(data)
+    _apply_parsed(invoice_id, shipment, invoice, parsed, f.filename, data, user,
+                  replace_source=True)
     return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
 
 
@@ -240,22 +262,61 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
     for f in files:
         files_by_step.setdefault(f["step_id"], []).append(f)
     items = db.get_items(invoice_id)
+    totals = _item_totals(items)
     return templates.TemplateResponse(
         request, "invoice.html",
         {
             "user": user, "invoice": invoice,
             "shipment": shipment, "steps": steps, "files": files,
             "files_by_step": files_by_step, "progress": db.progress(invoice_id),
-            "statuses": db.STATUSES, "items": items, "nav": "invoices",
+            "statuses": db.STATUSES, "items": items, "totals": totals,
+            "nav": "invoices",
         },
     )
 
 
+def _num(x) -> float:
+    try:
+        return float(str(x).replace(" ", "").replace(",", "."))
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _fmt_num(x: float) -> str:
+    if x == int(x):
+        return f"{int(x):,}".replace(",", " ")
+    return f"{x:,.2f}".replace(",", " ")
+
+
+def _item_totals(items) -> dict:
+    return {
+        "qty": _fmt_num(sum(_num(it["qty"]) for it in items)),
+        "total_price": _fmt_num(sum(_num(it["total_price"]) for it in items)),
+        "net": _fmt_num(sum(_num(it["net_weight"]) for it in items)),
+        "gross": _fmt_num(sum(_num(it["gross_weight"]) for it in items)),
+        "boxes": _fmt_num(sum(_num(it["box_count"]) for it in items)),
+    }
+
+
 @app.post("/invoices/{invoice_id}/steps/{step_id}")
-def set_step(request: Request, invoice_id: int, step_id: int,
-             status: str = Form(...), note: str = Form(""),
-             user=Depends(require_user)):
+async def set_step(request: Request, invoice_id: int, step_id: int,
+                   status: str = Form(...), note: str = Form(""),
+                   f: UploadFile = File(None), user=Depends(require_user)):
+    """Сохранить шаг: статус + заметка, и (опционально) приложить файл."""
     db.update_step(step_id, status, note)
+    if f is not None and f.filename:
+        invoice = db.get_invoice(invoice_id)
+        shipment = db.get_shipment(invoice["shipment_id"])
+        data = await f.read()
+        _save_original(invoice_id, shipment, invoice, f.filename, data, step_id, user["name"])
+    return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
+
+
+@app.post("/invoices/{invoice_id}/steps/{step_id}/delfile")
+def delete_step_file(request: Request, invoice_id: int, step_id: int,
+                     user=Depends(require_user)):
+    """Удалить файл(ы), привязанные к шагу."""
+    db.delete_step_files(step_id)
     return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
 
 
