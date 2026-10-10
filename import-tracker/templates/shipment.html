@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Поставка {{ shipment.number }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="/">← Все поставки</a></p>
+<h1>Поставка {{ shipment.number }}</h1>
+{% if shipment.title %}<p class="muted">{{ shipment.title }}</p>{% endif %}
+
+<div class="card">
+  <h2>Новый инвойс в этой поставке</h2>
+  <form method="post" action="/shipments/{{ shipment.id }}/invoices">
+    <div class="row">
+      <div style="flex:0 0 180px">
+        <label class="lbl">Номер инвойса *</label>
+        <input type="text" name="number" required>
+      </div>
+      <div>
+        <label class="lbl">Поставщик</label>
+        <input type="text" name="supplier">
+      </div>
+      <div style="flex:0 0 160px">
+        <label class="lbl">Сумма</label>
+        <input type="text" name="amount">
+      </div>
+    </div>
+    <div style="height:12px"></div>
+    <button class="btn" type="submit">Добавить инвойс</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Инвойсы</h2>
+  {% if rows %}
+  <table>
+    <tr><th>Инвойс</th><th>Поставщик</th><th>Текущий этап</th><th></th></tr>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/invoices/{{ r.inv.id }}"><b>{{ r.inv.number }}</b></a></td>
+      <td>{{ r.inv.supplier or "—" }}</td>
+      <td>
+        {% if r.progress.current == "Закрыто" %}
+          <span class="pill ok">✓ Закрыто</span>
+        {% else %}
+          <span class="stage-now">{{ r.progress.current }}</span>
+          <span class="muted"> — шаг {{ r.progress.done + 1 }} из {{ r.progress.total }}</span>
+        {% endif %}
+      </td>
+      <td><a href="/invoices/{{ r.inv.id }}">открыть →</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">В этой поставке пока нет инвойсов.</p>
+  {% endif %}
+</div>
+{% endblock %}

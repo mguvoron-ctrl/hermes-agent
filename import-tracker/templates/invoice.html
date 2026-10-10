@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Инвойс {{ invoice.number }}{% endblock %}
+{% block content %}
+<p class="muted">
+  <a href="/">Поставки</a> ·
+  <a href="/shipments/{{ shipment.id }}">Поставка {{ shipment.number }}</a> · Инвойс
+</p>
+<h1>Инвойс {{ invoice.number }}</h1>
+<p class="muted">
+  {% if invoice.supplier %}Поставщик: {{ invoice.supplier }}{% endif %}
+  {% if invoice.amount %} · Сумма: {{ invoice.amount }}{% endif %}
+</p>
+
+<div class="card">
+  {% if progress.current == "Закрыто" %}
+    <h2>Статус: <span class="pill ok">✓ Все этапы пройдены</span></h2>
+  {% else %}
+    <h2 style="margin-bottom:6px">Сейчас на этапе:</h2>
+    <div class="stage-now" style="font-size:16px">{{ progress.current }}</div>
+    <span class="muted"> — шаг {{ progress.done + 1 }} из {{ progress.total }}</span>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Этапы процесса</h2>
+  {% for s in steps %}
+  {% set st = s.status %}
+  {% set cls = 'ok' if st == 'готово' else ('work' if st == 'в работе' else 'wait') %}
+  {% set mark = '✓' if st == 'готово' else ('…' if st == 'в работе' else '') %}
+  {% set is_current = (progress.current == s.name) %}
+  <div class="step {{ 'current' if is_current else '' }}">
+    <div class="dot {{ cls }}">{{ mark }}</div>
+    <div style="flex:1">
+      <div><b>{{ s.position + 1 }}. {{ s.name }}</b> <span class="kind">· {{ s.kind }}</span></div>
+
+      <form method="post" action="/invoices/{{ invoice.id }}/steps/{{ s.id }}"
+            style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start">
+        <select name="status" style="flex:0 0 150px">
+          {% for opt in statuses %}
+          <option value="{{ opt }}" {{ 'selected' if opt == st else '' }}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="note" placeholder="заметка (кому отправил, дата…)"
+               value="{{ s.note or '' }}" style="flex:1; min-width:180px">
+        <button class="btn sm" type="submit">Сохранить</button>
+      </form>
+
+      {# Файлы этого шага #}
+      {% set sfiles = files_by_step.get(s.id, []) %}
+      {% if sfiles %}
+      <div style="margin-top:8px">
+        {% for f in sfiles %}
+        <div class="file-item">
+          📄 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>
+          <span class="muted">· {{ f.uploaded_at }}</span>
+          <form method="post" action="/files/{{ f.id }}/delete" style="display:inline">
+            <input type="hidden" name="invoice_id" value="{{ invoice.id }}">
+            <button class="btn sm danger" type="submit"
+                    onclick="return confirm('Удалить файл?')">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/invoices/{{ invoice.id }}/files"
+            enctype="multipart/form-data" style="margin-top:6px; display:flex; gap:8px; align-items:center">
+        <input type="hidden" name="step_id" value="{{ s.id }}">
+        <input type="file" name="f" required>
+        <button class="btn sm ghost" type="submit">Прикрепить к шагу</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Общая папка документов инвойса</h2>
+  <p class="muted">Файлы без привязки к конкретному шагу.</p>
+  <form method="post" action="/invoices/{{ invoice.id }}/files"
+        enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center; margin-bottom:10px">
+    <input type="file" name="f" required>
+    <button class="btn sm" type="submit">Загрузить</button>
+  </form>
+  {% set loose = files_by_step.get(None, []) %}
+  {% if loose %}
+    {% for f in loose %}
+    <div class="file-item" style="padding:4px 0">
+      📄 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>
+      <span class="muted">· загрузил {{ f.uploaded_by }} · {{ f.uploaded_at }}</span>
+      <form method="post" action="/files/{{ f.id }}/delete" style="display:inline">
+        <input type="hidden" name="invoice_id" value="{{ invoice.id }}">
+        <button class="btn sm danger" type="submit" onclick="return confirm('Удалить файл?')">✕</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">Пока нет файлов без привязки к шагу.</p>
+  {% endif %}
+</div>
+{% endblock %}

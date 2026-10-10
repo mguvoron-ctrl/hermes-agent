@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Поставки{% endblock %}
+{% block content %}
+<h1>Поставки</h1>
+
+<div class="card">
+  <h2>Новая поставка</h2>
+  <form method="post" action="/shipments">
+    <div class="row">
+      <div style="flex:0 0 200px">
+        <label class="lbl">Номер поставки *</label>
+        <input type="text" name="number" required>
+      </div>
+      <div>
+        <label class="lbl">Название / комментарий</label>
+        <input type="text" name="title">
+      </div>
+    </div>
+    <div style="height:12px"></div>
+    <button class="btn" type="submit">Создать поставку</button>
+  </form>
+</div>
+
+<div class="card">
+  {% if shipments %}
+  <table>
+    <tr><th>Номер поставки</th><th>Название</th><th>Инвойсов</th><th>Создана</th></tr>
+    {% for s in shipments %}
+    <tr>
+      <td><a href="/shipments/{{ s.id }}"><b>{{ s.number }}</b></a></td>
+      <td>{{ s.title or "—" }}</td>
+      <td>{{ s.invoice_count }}</td>
+      <td class="muted">{{ s.created_at }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Пока нет ни одной поставки. Создай первую выше ↑</p>
+  {% endif %}
+</div>
+{% endblock %}

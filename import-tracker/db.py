@@ -1,0 +1,331 @@
+"""
+Хранилище данных на чистом SQLite (stdlib, без ORM) — чтобы было легко
+читать и дорабатывать под себя.
+
+Структура:
+  users      — пользователи (ты и коллеги)
+  shipments  — ПОСТАВКИ (у каждой свой номер)
+  invoices   — ИНВОЙСЫ (принадлежат ровно одной поставке)
+  steps      — шаги процесса по каждому инвойсу (это и есть прогресс)
+  files      — загруженные документы (физически лежат в папках на диске)
+"""
+
+import os
+import sqlite3
+import hashlib
+import secrets
+from datetime import datetime
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+FILES_DIR = DATA_DIR / "files"           # сюда складываются сами документы
+DB_PATH = DATA_DIR / "tracker.db"
+
+DATA_DIR.mkdir(exist_ok=True)
+FILES_DIR.mkdir(exist_ok=True)
+
+
+# --- Шаблон процесса по инвойсу -------------------------------------------
+# Это НАСТРАИВАЕМЫЙ список. При создании инвойса эти шаги копируются к нему.
+# Поменяешь здесь — новые инвойсы будут создаваться с новым списком.
+# kind: входящий | создать | отправка | согласование
+DEFAULT_STEPS = [
+    ("Инвойс", "входящий"),
+    ("Пакинг лист", "входящий"),
+    ("Перевод", "входящий"),
+    ("Камьен", "создать"),
+    ("Спецификация", "создать"),
+    ("Русификация", "создать"),
+    ("Русификация отправлена на согл. (бренд-менеджер РУС)", "отправка"),
+    ("РУС согласовано", "согласование"),
+    ("Файл товаров и паллет", "входящий"),
+    ("Склад", "создать"),
+    ("Документы отправлены брокеру", "отправка"),
+    ("Национальный каталог", "создать"),
+    ("Транзит", "создать"),
+]
+
+STATUSES = ["не начато", "в работе", "готово"]
+
+
+def now() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+
+def get_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def init_db() -> None:
+    conn = get_conn()
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            username      TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role          TEXT NOT NULL DEFAULT 'user',   -- admin | user
+            created_at    TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS shipments (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            number     TEXT UNIQUE NOT NULL,              -- номер поставки
+            title      TEXT,
+            note       TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS invoices (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            shipment_id INTEGER NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+            number      TEXT NOT NULL,                    -- номер инвойса
+            supplier    TEXT,
+            amount      TEXT,
+            note        TEXT,
+            created_at  TEXT NOT NULL,
+            UNIQUE (shipment_id, number)
+        );
+
+        CREATE TABLE IF NOT EXISTS steps (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            invoice_id  INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+            position    INTEGER NOT NULL,
+            name        TEXT NOT NULL,
+            kind        TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'не начато',
+            note        TEXT,
+            updated_at  TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS files (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            invoice_id   INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+            step_id      INTEGER REFERENCES steps(id) ON DELETE SET NULL,
+            original_name TEXT NOT NULL,
+            stored_path  TEXT NOT NULL,
+            size         INTEGER,
+            uploaded_by  TEXT,
+            uploaded_at  TEXT NOT NULL
+        );
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+# --- Пользователи / пароли -------------------------------------------------
+def hash_password(password: str, salt: str | None = None) -> str:
+    salt = salt or secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 200_000)
+    return f"{salt}${dk.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        salt, _ = stored.split("$", 1)
+    except ValueError:
+        return False
+    return secrets.compare_digest(hash_password(password, salt), stored)
+
+
+def create_user(username: str, password: str, role: str = "user") -> None:
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO users (username, password_hash, role, created_at) VALUES (?,?,?,?)",
+        (username, hash_password(password), role, now()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_user(username: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    conn.close()
+    return row
+
+
+def list_users():
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM users ORDER BY username").fetchall()
+    conn.close()
+    return rows
+
+
+def ensure_admin() -> str | None:
+    """Создаёт первого админа, если пользователей ещё нет.
+    Логин/пароль берутся из ENV или по умолчанию admin/admin."""
+    conn = get_conn()
+    count = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+    conn.close()
+    if count:
+        return None
+    username = os.getenv("ADMIN_USER", "admin")
+    password = os.getenv("ADMIN_PASSWORD", "admin")
+    create_user(username, password, role="admin")
+    return username
+
+
+# --- Поставки --------------------------------------------------------------
+def list_shipments():
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT s.*,
+               (SELECT COUNT(*) FROM invoices i WHERE i.shipment_id = s.id) AS invoice_count
+        FROM shipments s ORDER BY s.created_at DESC
+        """
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def create_shipment(number: str, title: str = "", note: str = "") -> int:
+    conn = get_conn()
+    cur = conn.execute(
+        "INSERT INTO shipments (number, title, note, created_at) VALUES (?,?,?,?)",
+        (number.strip(), title.strip(), note.strip(), now()),
+    )
+    conn.commit()
+    sid = cur.lastrowid
+    conn.close()
+    return sid
+
+
+def get_shipment(shipment_id: int):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM shipments WHERE id = ?", (shipment_id,)).fetchone()
+    conn.close()
+    return row
+
+
+# --- Инвойсы ---------------------------------------------------------------
+def list_invoices(shipment_id: int):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM invoices WHERE shipment_id = ? ORDER BY created_at",
+        (shipment_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def create_invoice(shipment_id: int, number: str, supplier: str = "",
+                   amount: str = "", note: str = "") -> int:
+    conn = get_conn()
+    cur = conn.execute(
+        """INSERT INTO invoices (shipment_id, number, supplier, amount, note, created_at)
+           VALUES (?,?,?,?,?,?)""",
+        (shipment_id, number.strip(), supplier.strip(), amount.strip(), note.strip(), now()),
+    )
+    invoice_id = cur.lastrowid
+    # Копируем шаблон шагов именно этому инвойсу
+    for pos, (name, kind) in enumerate(DEFAULT_STEPS):
+        conn.execute(
+            """INSERT INTO steps (invoice_id, position, name, kind, status, updated_at)
+               VALUES (?,?,?,?, 'не начато', ?)""",
+            (invoice_id, pos, name, kind, now()),
+        )
+    conn.commit()
+    conn.close()
+    return invoice_id
+
+
+def get_invoice(invoice_id: int):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    conn.close()
+    return row
+
+
+# --- Шаги / прогресс -------------------------------------------------------
+def get_steps(invoice_id: int):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM steps WHERE invoice_id = ? ORDER BY position", (invoice_id,)
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def update_step(step_id: int, status: str, note: str = "") -> None:
+    conn = get_conn()
+    conn.execute(
+        "UPDATE steps SET status = ?, note = ?, updated_at = ? WHERE id = ?",
+        (status, note.strip(), now(), step_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def progress(invoice_id: int) -> dict:
+    """Процент готовности инвойса + текущий шаг (первый невыполненный)."""
+    steps = get_steps(invoice_id)
+    total = len(steps) or 1
+    done = sum(1 for s in steps if s["status"] == "готово")
+    current = next((s["name"] for s in steps if s["status"] != "готово"), "Закрыто")
+    return {
+        "done": done,
+        "total": len(steps),
+        "percent": round(done * 100 / total),
+        "current": current,
+    }
+
+
+# --- Файлы -----------------------------------------------------------------
+def list_files(invoice_id: int):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM files WHERE invoice_id = ? ORDER BY uploaded_at DESC",
+        (invoice_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def add_file(invoice_id: int, step_id, original_name: str, stored_path: str,
+             size: int, uploaded_by: str) -> None:
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO files (invoice_id, step_id, original_name, stored_path,
+                              size, uploaded_by, uploaded_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        (invoice_id, step_id, original_name, stored_path, size, uploaded_by, now()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_file(file_id: int):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def delete_file(file_id: int) -> None:
+    conn = get_conn()
+    row = conn.execute("SELECT stored_path FROM files WHERE id = ?", (file_id,)).fetchone()
+    if row:
+        try:
+            os.remove(row["stored_path"])
+        except OSError:
+            pass
+    conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
+    conn.commit()
+    conn.close()
+
+
+def invoice_folder(shipment_number: str, invoice_number: str) -> Path:
+    """Реальная папка на диске для документов инвойса."""
+    def safe(name: str) -> str:
+        return "".join(c if c.isalnum() or c in "-_." else "_" for c in name).strip("_") or "x"
+
+    folder = FILES_DIR / safe(shipment_number) / safe(invoice_number)
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder

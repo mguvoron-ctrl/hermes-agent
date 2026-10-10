@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Трекер поставок{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #f4f5f7; --card: #fff; --ink: #1c2430; --muted: #6b7684;
+      --line: #e3e6ea; --accent: #2f6feb; --ok: #1a9c56; --work: #d9880a; --wait: #8a94a0;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font: 15px/1.5 -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+           background: var(--bg); color: var(--ink); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header { background: var(--ink); color:#fff; padding: 12px 20px; display:flex;
+             align-items:center; gap:18px; }
+    header .brand { font-weight:700; font-size:17px; }
+    header a { color:#cdd6e4; }
+    header .spacer { flex:1; }
+    .wrap { max-width: 1000px; margin: 22px auto; padding: 0 16px; }
+    .card { background: var(--card); border:1px solid var(--line); border-radius:10px;
+            padding:18px; margin-bottom:16px; }
+    h1 { font-size:22px; margin:0 0 14px; }
+    h2 { font-size:17px; margin:0 0 10px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.03em; }
+    input[type=text], input[type=password], textarea, select {
+      width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
+      font: inherit; background:#fff; }
+    textarea { min-height:52px; resize:vertical; }
+    .btn { display:inline-block; background:var(--accent); color:#fff; border:none;
+           padding:9px 15px; border-radius:7px; font:inherit; cursor:pointer; }
+    .btn:hover { filter:brightness(1.05); }
+    .btn.sm { padding:5px 10px; font-size:13px; }
+    .btn.ghost { background:#eef1f5; color:var(--ink); }
+    .btn.danger { background:#e5484d; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .row > * { flex:1; min-width:160px; }
+    .muted { color: var(--muted); }
+    .pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:13px; font-weight:600; }
+    .pill.ok   { background:#e2f5ea; color:var(--ok); }
+    .pill.work { background:#fdf0da; color:var(--work); }
+    .pill.wait { background:#eef1f5; color:var(--wait); }
+    .stage-now { background:#eaf1ff; color:var(--accent); border:1px solid #cfe0ff;
+                 padding:6px 12px; border-radius:8px; font-weight:700; display:inline-block; }
+    .step { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--line); }
+    .step.current { background:#f3f8ff; border-radius:8px; padding:12px; margin:0 -12px; border-bottom:none; }
+    .step .dot { width:26px; height:26px; border-radius:50%; flex:0 0 26px; text-align:center;
+                 line-height:26px; font-size:14px; }
+    .dot.ok   { background:var(--ok); color:#fff; }
+    .dot.work { background:var(--work); color:#fff; }
+    .dot.wait { background:#dfe3e8; color:#8a94a0; }
+    .kind { font-size:12px; color:var(--muted); }
+    .err { background:#fdecee; color:#c0393e; padding:10px 12px; border-radius:7px; margin-bottom:12px; }
+    .file-item { font-size:13px; }
+    label.lbl { font-size:13px; color:var(--muted); display:block; margin-bottom:4px; }
+  </style>
+</head>
+<body>
+  {% if user %}
+  <header>
+    <span class="brand">📦 Трекер поставок</span>
+    <a href="/">Поставки</a>
+    {% if user.role == 'admin' %}<a href="/users">Пользователи</a>{% endif %}
+    <span class="spacer"></span>
+    <span class="muted">{{ user.name }}</span>
+    <a href="/logout">Выйти</a>
+  </header>
+  {% endif %}
+  <div class="wrap">
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>
