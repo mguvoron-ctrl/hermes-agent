@@ -123,8 +123,10 @@ def _parse_items(m_inv, m_rus, m_pack) -> list[dict]:
     header_i = None
     for i, row in enumerate(m_inv):
         joined = " ".join(_norm(c) for c in row)
-        if ("customcode" in joined or "кодтнвэд" in joined) and (
-            "qty" in joined or "колво" in joined or "quantity" in joined):
+        # заголовок: столбец кода (Custom/Customs Code, Код ТН ВЭД, HS Code) + столбец кол-ва
+        has_code = ("custom" in joined or "тнвэд" in joined or "hscode" in joined)
+        has_qty = ("qty" in joined or "колво" in joined or "quantity" in joined)
+        if has_code and has_qty:
             header_i = i
             break
     if header_i is None:
