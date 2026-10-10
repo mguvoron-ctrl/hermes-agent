@@ -108,12 +108,19 @@ def index(request: Request, user=Depends(require_user)):
 
 @app.get("/invoices", response_class=HTMLResponse)
 def all_invoices(request: Request, user=Depends(require_user)):
-    """Общий экран: все инвойсы и на каком этапе каждый."""
+    """Общий экран-матрица: строки — инвойсы, столбцы — этапы, в клетках галочки."""
     rows = []
     for inv in db.list_all_invoices():
-        rows.append({"inv": inv, "progress": db.progress(inv["id"])})
+        steps = db.get_steps(inv["id"])
+        rows.append({
+            "inv": inv,
+            "statuses": [s["status"] for s in steps],  # по порядку этапов
+            "progress": db.progress(inv["id"]),
+        })
     return templates.TemplateResponse(
-        request, "all_invoices.html", {"user": user, "rows": rows, "nav": "invoices"}
+        request, "all_invoices.html",
+        {"user": user, "rows": rows, "stages": db.STAGE_SHORT,
+         "stage_full": [n for n, _ in db.DEFAULT_STEPS], "nav": "invoices"},
     )
 
 
