@@ -50,8 +50,7 @@
     {% if src %}Заменить файл и обновить данные{% else %}Загрузить Excel{% endif %}
   </button>
   <form id="reimp" class="edit" method="post" action="/invoices/{{ invoice.id }}/reimport"
-        enctype="multipart/form-data"
-        style="margin-top:10px; display:none; gap:8px; align-items:center; flex-wrap:wrap">
+        enctype="multipart/form-data" style="margin-top:10px">
     <input type="file" name="f" accept=".xlsx,.xlsm" required style="flex:1; min-width:200px">
     <button class="btn sm" type="submit">Сохранить</button>
     <button class="btn sm ghost" type="button"

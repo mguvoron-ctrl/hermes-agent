@@ -111,14 +111,17 @@
 
     /* матрица этапов */
     .matrix{font-size:13px}
-    .matrix thead th{padding:9px 7px; text-align:center}
-    .matrix tbody td{padding:9px 7px; text-align:center}
-    .matrix th.left,.matrix td.left{text-align:left; white-space:nowrap}
-    .matrix thead th.left{position:sticky; left:0; background:#fff; z-index:3}
+    .matrix thead th{padding:12px 10px; text-align:center; background:#f6f9fc;
+      border-right:1px solid var(--line2); min-width:84px}
+    .matrix tbody td{padding:13px 10px; text-align:center; border-right:1px solid var(--line2); min-width:84px}
+    .matrix th:last-child,.matrix td:last-child{border-right:none}
+    .matrix th.left,.matrix td.left{text-align:left; white-space:nowrap; min-width:170px}
+    .matrix thead th.left{position:sticky; left:0; background:#f6f9fc; z-index:3}
     .matrix tbody td.left{position:sticky; left:0; background:#fff; z-index:1; box-shadow:1px 0 0 var(--line)}
-    .matrix tr.clickable:hover td.left{background:#fafbfe}
+    .matrix tr.clickable:hover td{background:#f4f8ff}
+    .matrix tr.clickable:hover td.left{background:#f4f8ff}
     .cell{display:inline-flex; align-items:center; justify-content:center;
-          width:24px; height:24px; border-radius:7px; font-size:13px; font-weight:700}
+          width:28px; height:28px; border-radius:8px; font-size:14px; font-weight:700}
     .cell.ok{background:var(--ok-bg); color:var(--ok)}
     .cell.now{background:var(--accent-weak); color:var(--accent)}
     .cell.wait{color:#ccd2da; font-weight:400}
@@ -170,5 +173,35 @@
   <div class="wrap">
     {% block content %}{% endblock %}
   </div>
+
+  <script>
+  // Перетаскивание широкой таблицы мышкой (зажал и тянешь влево-вправо)
+  document.addEventListener('DOMContentLoaded', function(){
+    document.querySelectorAll('.scroll-x').forEach(function(el){
+      var down=false, moved=false, startX=0, startScroll=0;
+      function scrollable(){ return el.scrollWidth > el.clientWidth + 2; }
+      function refresh(){ el.style.cursor = scrollable() ? 'grab' : ''; }
+      refresh(); window.addEventListener('resize', refresh);
+      el.addEventListener('mousedown', function(e){
+        if(!scrollable()) return;
+        down=true; moved=false; startX=e.pageX; startScroll=el.scrollLeft;
+        el.style.cursor='grabbing';
+      });
+      window.addEventListener('mouseup', function(){
+        if(down){ down=false; el.style.cursor = scrollable() ? 'grab' : ''; }
+      });
+      el.addEventListener('mousemove', function(e){
+        if(!down) return;
+        if(Math.abs(e.pageX-startX) > 4) moved=true;
+        e.preventDefault();
+        el.scrollLeft = startScroll - (e.pageX - startX);
+      });
+      // если двигали — не считаем это кликом по строке
+      el.addEventListener('click', function(e){
+        if(moved){ e.preventDefault(); e.stopPropagation(); moved=false; }
+      }, true);
+    });
+  });
+  </script>
 </body>
 </html>

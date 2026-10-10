@@ -315,8 +315,9 @@ async def set_step(request: Request, invoice_id: int, step_id: int,
 @app.post("/invoices/{invoice_id}/steps/{step_id}/delfile")
 def delete_step_file(request: Request, invoice_id: int, step_id: int,
                      user=Depends(require_user)):
-    """Удалить файл(ы), привязанные к шагу."""
+    """Удалить файл(ы) этапа и снять отметку (этап снова «не начато»)."""
     db.delete_step_files(step_id)
+    db.set_step_status(step_id, "не начато")
     return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
 
 

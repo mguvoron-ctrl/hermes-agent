@@ -445,6 +445,15 @@ def get_file(file_id: int):
     return row
 
 
+def set_step_status(step_id: int, status: str) -> None:
+    """Меняет только статус шага (заметку не трогает)."""
+    conn = get_conn()
+    conn.execute("UPDATE steps SET status = ?, updated_at = ? WHERE id = ?",
+                 (status, now(), step_id))
+    conn.commit()
+    conn.close()
+
+
 def delete_step_files(step_id: int) -> None:
     """Удаляет все файлы, привязанные к шагу (и с диска)."""
     conn = get_conn()
