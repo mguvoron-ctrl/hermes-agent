@@ -260,7 +260,8 @@ async def reimport_invoice(request: Request, invoice_id: int,
 
 # --- Инвойс (шаги + файлы) -------------------------------------------------
 @app.get("/invoices/{invoice_id}", response_class=HTMLResponse)
-def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)):
+def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
+                   user=Depends(require_user)):
     invoice = db.get_invoice(invoice_id)
     if not invoice:
         raise HTTPException(404, "Инвойс не найден")
@@ -284,7 +285,7 @@ def invoice_detail(request: Request, invoice_id: int, user=Depends(require_user)
             "shipment": shipment, "steps": steps, "files": files,
             "files_by_step": files_by_step, "progress": db.progress(invoice_id),
             "statuses": db.STATUSES, "items": items, "totals": totals,
-            "vitems": vitems, "vsummary": vsummary,
+            "vitems": vitems, "vsummary": vsummary, "camion_updated": camion,
             "items_json": items_json, "nav": "invoices",
         },
     )
@@ -430,6 +431,7 @@ async def set_step(request: Request, invoice_id: int, step_id: int,
             if parsed.get("items"):
                 db.set_invoice_fields(invoice_id, parsed["fields"])
                 db.replace_items(invoice_id, parsed["items"])
+                return RedirectResponse(f"/invoices/{invoice_id}?camion=1", status_code=302)
     return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
 
 

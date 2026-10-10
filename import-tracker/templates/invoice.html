@@ -92,6 +92,10 @@
     <button class="btn sm ghost" type="button" onclick="startEditGoods()">✏️ Изменить таблицу</button>
   </div>
 
+  {% if camion_updated %}
+  <div class="ed-hint" style="margin-top:6px"><span class="badge ok">✓ Таблица обновлена из загруженного Камьёна</span></div>
+  {% endif %}
+
   {% if vsummary.checked %}
     {% if vsummary.bad or vsummary.warn %}
     <div class="ed-hint" style="margin-top:4px">
