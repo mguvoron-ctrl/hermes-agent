@@ -87,7 +87,8 @@
 <div class="card" id="goods-card">
   <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
     <h2 style="margin:0">Товары <span class="muted" style="font-weight:500">({{ items|length }})</span></h2>
-    <button class="btn sm ghost" style="margin-left:auto" type="button" onclick="startEditGoods()">✏️ Изменить таблицу</button>
+    <a class="btn sm" style="margin-left:auto" href="/invoices/{{ invoice.id }}/camion.xlsx">⬇️ Скачать Камьён (Excel)</a>
+    <button class="btn sm ghost" type="button" onclick="startEditGoods()">✏️ Изменить таблицу</button>
   </div>
 
   {% if vsummary.checked %}

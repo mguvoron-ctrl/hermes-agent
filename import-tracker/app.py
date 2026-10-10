@@ -15,7 +15,7 @@ import shutil
 import tempfile
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -488,6 +488,91 @@ def add_user(request: Request, username: str = Form(...), password: str = Form(.
         error = "Такой логин уже существует"
     return templates.TemplateResponse(
         request, "users.html", {"user": user, "users": db.list_users(), "error": error, "nav": "users"}
+    )
+
+
+def _xl_num(v):
+    """Строку-число -> число (для Excel); иначе исходная строка; пусто -> ''."""
+    s = str(v or "").strip().replace(" ", "")
+    if s == "":
+        return ""
+    try:
+        f = float(s.replace(",", "."))
+        return int(f) if f == int(f) else f
+    except ValueError:
+        return str(v).strip()
+
+
+@app.get("/invoices/{invoice_id}/camion.xlsx")
+def export_camion(request: Request, invoice_id: int, user=Depends(require_user)):
+    """Готовый Камьён-реестр в Excel: метаданные + 15 колонок + подсветка проблем."""
+    import io
+    import re
+    from urllib.parse import quote
+    from openpyxl import Workbook
+    from openpyxl.styles import PatternFill, Font
+    from openpyxl.utils import get_column_letter
+
+    invoice = db.get_invoice(invoice_id)
+    if not invoice:
+        raise HTTPException(404, "Инвойс не найден")
+    items = db.get_items(invoice_id)
+    vitems, _ = validate_items(items)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Лист1"
+    red = PatternFill("solid", fgColor="FF0000")
+    yel = PatternFill("solid", fgColor="FFFF00")
+    fill = {"bad": red, "warn": yel}
+
+    contract = invoice["contract"] or ""
+    mno = re.search(r"№\s*([\w./\-]+)", contract)
+    mdt = re.search(r"(?:from|от)\s*([\d./\-]+)", contract, re.I)
+    ws["A1"] = "Отправитель:"; ws["B1"] = invoice["supplier"] or ""
+    ws["A2"] = "Контракт №:"; ws["B2"] = mno.group(1) if mno else ""
+    ws["A3"] = "Дата контракта:"; ws["B3"] = mdt.group(1) if mdt else ""
+
+    headers = ["Custom code", "Item code", "Designation", "Designation rus", "Qty",
+               "CIP", "Net total", "Net Weight, kg", "Brut Weigt, kg", "Boxes",
+               "Invoice", "Origine", "Producteur", "EAN", "Кол-во сост."]
+    for j, h in enumerate(headers, 1):
+        ws.cell(4, j, h).font = Font(bold=True)
+
+    r = 5
+    for it in vitems:
+        ws.cell(r, 1, _xl_num(it["hs_code"]))
+        ws.cell(r, 2, it["item_code"])
+        ws.cell(r, 3, it["name_en"])
+        ws.cell(r, 4, it["name"])
+        ws.cell(r, 5, _xl_num(it["qty"]))
+        ws.cell(r, 6, _xl_num(it["unit_price"]))
+        ws.cell(r, 7, _xl_num(it["total_price"]))
+        ws.cell(r, 8, _xl_num(it["net_weight"]))
+        ws.cell(r, 9, _xl_num(it["gross_weight"]))
+        ws.cell(r, 10, _xl_num(it["box_count"]))
+        ws.cell(r, 11, invoice["number"])
+        ws.cell(r, 12, it["origin"])
+        ws.cell(r, 13, it["producer"])
+        ws.cell(r, 14, it["barcode"]).number_format = "@"
+        ws.cell(r, 15, 1)
+        for col, st in ((1, it["hs_st"]), (4, it["rus_st"]), (12, it["origin_st"]),
+                        (13, it["prod_st"]), (14, it["ean_st"])):
+            if st in fill:
+                ws.cell(r, col).fill = fill[st]
+        r += 1
+
+    widths = [13, 14, 34, 42, 8, 8, 11, 13, 13, 7, 15, 13, 24, 16, 9]
+    for j, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(j)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    fname = f"Камьён_{invoice['number']}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
     )
 
 
