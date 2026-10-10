@@ -525,19 +525,32 @@ def export_camion(request: Request, invoice_id: int, user=Depends(require_user))
 # --- Справочники (TRANSIT / НОВИНКИ) --------------------------------------
 @app.get("/references", response_class=HTMLResponse)
 def references_page(request: Request, user=Depends(require_user), msg: str = "",
-                    q: str = "", source: str = "", page: int = 1):
+                    q: str = "", source: str = "", brand: str = "", page: int = 1):
     if user["role"] != "admin":
         raise HTTPException(403, "Только для администратора")
     per = 50
     page = max(1, page)
-    rows, total = db.ref_search(q.strip(), source, limit=per, offset=(page - 1) * per)
+    rows, total = db.ref_search(q.strip(), source, brand, limit=per, offset=(page - 1) * per)
     pages = max(1, (total + per - 1) // per)
     return templates.TemplateResponse(
         request, "references.html",
-        {"user": user, "stats": db.ref_stats(), "msg": msg, "nav": "references",
-         "rows": rows, "total": total, "q": q, "source": source,
+        {"user": user, "brands": db.ref_brands(), "msg": msg, "nav": "references",
+         "rows": rows, "total": total, "q": q, "source": source, "brand": brand,
          "page": page, "pages": pages, "per": per},
     )
+
+
+def _brand_from_name(filename: str) -> str:
+    """Бренд из имени файла новинок (убираем годы, даты, лишние символы)."""
+    import re
+    name = os.path.splitext(os.path.basename(filename))[0]
+    name = re.sub(r"^[0-9a-f]{6,}-", "", name)          # хэш-префикс загрузки, если есть
+    name = name.replace("_", " ")
+    name = re.sub(r"\b(?:19|20)\d{2}\b", " ", name)      # годы
+    name = re.sub(r"\d+", " ", name)                     # прочие числа/даты
+    name = re.sub(r"[^\w\sА-Яа-яЁё&.-]", " ", name)
+    name = re.sub(r"\s+", " ", name).strip(" _-.")
+    return name or "Новинки"
 
 
 def _save_tmp(data: bytes, suffix: str) -> str:
@@ -596,7 +609,7 @@ async def references_novinki(request: Request, files: list[UploadFile] = File(..
         path = _save_tmp(data, suffix)
         try:
             rows = ref_import.parse_novinki(path)
-            db.ref_upsert_novinki(rows)
+            db.ref_upsert_novinki(rows, source_name=_brand_from_name(f.filename))
             total += len(rows); done += 1
         except Exception as e:
             print("novinki error", f.filename, e)

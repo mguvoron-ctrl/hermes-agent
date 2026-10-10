@@ -148,6 +148,7 @@ def init_db() -> None:
             origin     TEXT,               -- страна (Origine)
             producer   TEXT,               -- Fournisseur / производитель
             source     TEXT,               -- 'transit' | 'novinki'
+            source_name TEXT,              -- 'TRANSIT' или бренд/файл новинок
             supply_key INTEGER DEFAULT 0,
             updated_at TEXT
         );
@@ -174,6 +175,9 @@ def init_db() -> None:
     existing_items = {r["name"] for r in conn.execute("PRAGMA table_info(items)")}
     if "name_en" not in existing_items:
         conn.execute("ALTER TABLE items ADD COLUMN name_en TEXT")
+    existing_ref = {r["name"] for r in conn.execute("PRAGMA table_info(article_ref)")}
+    if "source_name" not in existing_ref:
+        conn.execute("ALTER TABLE article_ref ADD COLUMN source_name TEXT")
     conn.commit()
     _load_ref_seed_if_empty(conn)
     conn.close()
@@ -200,11 +204,13 @@ def _load_ref_seed_if_empty(conn) -> None:
         return
     conn.executemany(
         """INSERT OR IGNORE INTO article_ref
-           (article, hs_code, ean, name_rus, origin, producer, source, supply_key, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?)""",
+           (article, hs_code, ean, name_rus, origin, producer, source, source_name, supply_key, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
         [(r.get("article", ""), r.get("hs_code", ""), r.get("ean", ""),
           r.get("name_rus", ""), r.get("origin", ""), r.get("producer", ""),
-          r.get("source", "seed"), r.get("supply_key", 0), now()) for r in rows],
+          r.get("source", "seed"),
+          r.get("source_name", "TRANSIT" if r.get("source") == "transit" else "Новинки"),
+          r.get("supply_key", 0), now()) for r in rows],
     )
     conn.commit()
 
@@ -554,8 +560,8 @@ def ref_upsert_transit(rows: list[dict]) -> int:
     conn = get_conn()
     conn.executemany(
         """INSERT OR REPLACE INTO article_ref
-           (article, hs_code, ean, name_rus, origin, producer, source, supply_key, updated_at)
-           VALUES (?,?,?,?,?,?, 'transit', ?, ?)""",
+           (article, hs_code, ean, name_rus, origin, producer, source, source_name, supply_key, updated_at)
+           VALUES (?,?,?,?,?,?, 'transit', 'TRANSIT', ?, ?)""",
         [(r["article"], r.get("hs_code", ""), r.get("ean", ""), r.get("name_rus", ""),
           r.get("origin", ""), r.get("producer", ""), r.get("supply_key", 0), now())
          for r in rows],
@@ -565,19 +571,33 @@ def ref_upsert_transit(rows: list[dict]) -> int:
     return len(rows)
 
 
-def ref_upsert_novinki(rows: list[dict]) -> int:
+def ref_upsert_novinki(rows: list[dict], source_name: str = "Новинки") -> int:
     """НОВИНКИ добавляют только артикулы, которых ещё нет (TRANSIT не трогаем)."""
     conn = get_conn()
     conn.executemany(
         """INSERT OR IGNORE INTO article_ref
-           (article, hs_code, ean, name_rus, origin, producer, source, supply_key, updated_at)
-           VALUES (?,?,?,?,?,?, 'novinki', 0, ?)""",
+           (article, hs_code, ean, name_rus, origin, producer, source, source_name, supply_key, updated_at)
+           VALUES (?,?,?,?,?,?, 'novinki', ?, 0, ?)""",
         [(r["article"], r.get("hs_code", ""), r.get("ean", ""), r.get("name_rus", ""),
-          r.get("origin", ""), r.get("producer", ""), now()) for r in rows],
+          r.get("origin", ""), r.get("producer", ""), r.get("source_name", source_name), now())
+         for r in rows],
     )
     conn.commit()
     conn.close()
     return len(rows)
+
+
+def ref_brands() -> dict:
+    """Содержимое справочника: TRANSIT (кол-во) + список брендов Новинок (кол-во)."""
+    conn = get_conn()
+    tr = conn.execute("SELECT COUNT(*) c FROM article_ref WHERE source='transit'").fetchone()["c"]
+    nv = conn.execute(
+        """SELECT COALESCE(source_name,'Новинки') AS name, COUNT(*) c
+           FROM article_ref WHERE source='novinki'
+           GROUP BY COALESCE(source_name,'Новинки') ORDER BY name"""
+    ).fetchall()
+    conn.close()
+    return {"transit": tr, "novinki": [dict(r) for r in nv]}
 
 
 def ref_get(article: str):
@@ -603,12 +623,15 @@ def ref_get_many(articles: list[str]) -> dict:
     return out
 
 
-def ref_search(q: str = "", source: str = "", limit: int = 50, offset: int = 0):
-    """Поиск/просмотр справочника с фильтром по источнику и пагинацией."""
+def ref_search(q: str = "", source: str = "", brand: str = "", limit: int = 50, offset: int = 0):
+    """Поиск/просмотр справочника с фильтром по источнику/бренду и пагинацией."""
     where, params = [], []
     if source in ("transit", "novinki"):
         where.append("source = ?")
         params.append(source)
+    if brand:
+        where.append("COALESCE(source_name,'Новинки') = ?")
+        params.append(brand)
     if q:
         where.append("(article LIKE ? OR name_rus LIKE ? OR hs_code LIKE ? OR ean LIKE ?)")
         qa = f"%{q.upper()}%"

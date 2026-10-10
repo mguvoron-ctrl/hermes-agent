@@ -9,41 +9,30 @@
 {% if msg %}<div class="card" style="border-color:#cfe0ff; background:#f6f9ff">{{ msg }}</div>{% endif %}
 
 <div class="card">
-  <h2>Что сейчас в справочнике</h2>
-  <table class="info" style="max-width:640px">
-    <tr><td class="k">Всего артикулов</td><td class="v"><b>{{ stats.total }}</b></td></tr>
-    <tr><td class="k">из них из TRANSIT</td><td class="v">{{ stats.transit }}</td></tr>
-    <tr><td class="k">из НОВИНОК</td><td class="v">{{ stats.novinki }}</td></tr>
-    <tr><td class="k">Обновлено</td><td class="v">{{ stats.updated or "—" }}</td></tr>
-  </table>
+  <h2>Что лежит в справочнике — нажми, чтобы открыть</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap">
+    <a class="btn {{ '' if source=='transit' else 'ghost' }}" href="/references?source=transit">📒 TRANSIT · {{ brands.transit }}</a>
+    {% for b in brands.novinki %}
+      <a class="btn {{ '' if brand==b.name else 'ghost' }}" href="/references?brand={{ b.name|urlencode }}">🆕 {{ b.name }} · {{ b.c }}</a>
+    {% endfor %}
+  </div>
+  <p class="muted" style="margin-top:12px; margin-bottom:0">
+    🆕 Новинки показывают артикулы, которых нет в TRANSIT. Числа — сколько артикулов.
+  </p>
 </div>
 
 <div class="card">
-  <h2>Загрузить TRANSIT</h2>
-  <p class="muted" style="margin-top:-6px">Мастер-база всех поставок. По каждому артикулу берётся
-     <b>самая свежая поставка</b>. Файл под паролем — укажи его (по умолчанию 2208).</p>
-  <form method="post" action="/references/transit" enctype="multipart/form-data"
-        style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-    <input type="file" name="f" accept=".xlsx" required style="flex:1; min-width:220px">
-    <input type="text" name="password" placeholder="пароль (2208)" value="2208" style="flex:0 0 150px">
-    <button class="btn" type="submit">Загрузить TRANSIT</button>
-  </form>
-</div>
-
-<div class="card">
-  <h2>Просмотр справочника</h2>
+  <h2>
+    {% if brand %}Новинки: {{ brand }}{% elif source=='transit' %}TRANSIT{% else %}Поиск по справочнику{% endif %}
+    <span class="muted" style="font-weight:500">· {{ total }}</span>
+  </h2>
   <form method="get" action="/references" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px">
+    <input type="hidden" name="source" value="{{ source }}">
+    <input type="hidden" name="brand" value="{{ brand }}">
     <input type="text" name="q" value="{{ q }}" placeholder="поиск: артикул, название, код ТН ВЭД, EAN" style="flex:1; min-width:220px">
-    <select name="source" style="flex:0 0 190px">
-      <option value="" {{ 'selected' if source=='' else '' }}>Все источники</option>
-      <option value="transit" {{ 'selected' if source=='transit' else '' }}>только TRANSIT</option>
-      <option value="novinki" {{ 'selected' if source=='novinki' else '' }}>только НОВИНКИ</option>
-    </select>
     <button class="btn" type="submit">Найти</button>
-    {% if q or source %}<a class="btn ghost sm" href="/references">Сбросить</a>{% endif %}
+    {% if q or source or brand %}<a class="btn ghost sm" href="/references">Сбросить всё</a>{% endif %}
   </form>
-
-  <p class="muted" style="margin-top:-4px">Найдено: {{ total }}{% if q or source %} (по фильтру){% endif %}.</p>
 
   {% if rows %}
   <div class="scroll-x">
@@ -60,7 +49,7 @@
         <td class="nm-ru">{{ r.name_rus or "—" }}</td>
         <td>{{ r.origin or "—" }}</td>
         <td>{{ r.producer or "—" }}</td>
-        <td><span class="badge {{ 'ok' if r.source=='transit' else 'accent' }}">{{ 'TRANSIT' if r.source=='transit' else 'Новинки' }}</span></td>
+        <td><span class="badge {{ 'ok' if r.source=='transit' else 'accent' }}">{{ r.source_name or ('TRANSIT' if r.source=='transit' else 'Новинки') }}</span></td>
       </tr>
     {% endfor %}
     </tbody>
@@ -69,7 +58,7 @@
 
   {% if pages > 1 %}
   <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap">
-    {% set qs = "q=" ~ q ~ "&source=" ~ source %}
+    {% set qs = "q=" ~ (q|urlencode) ~ "&source=" ~ source ~ "&brand=" ~ (brand|urlencode) %}
     {% if page > 1 %}<a class="btn sm ghost" href="/references?{{ qs }}&page={{ page-1 }}">← Назад</a>{% endif %}
     <span class="muted">Страница {{ page }} из {{ pages }}</span>
     {% if page < pages %}<a class="btn sm ghost" href="/references?{{ qs }}&page={{ page+1 }}">Вперёд →</a>{% endif %}
@@ -81,9 +70,21 @@
 </div>
 
 <div class="card">
+  <h2>Загрузить TRANSIT</h2>
+  <p class="muted" style="margin-top:-6px">Мастер-база всех поставок. По каждому артикулу берётся
+     <b>самая свежая поставка</b>. Файл под паролем — укажи его (по умолчанию 2208).</p>
+  <form method="post" action="/references/transit" enctype="multipart/form-data"
+        style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+    <input type="file" name="f" accept=".xlsx" required style="flex:1; min-width:220px">
+    <input type="text" name="password" placeholder="пароль (2208)" value="2208" style="flex:0 0 150px">
+    <button class="btn" type="submit">Загрузить TRANSIT</button>
+  </form>
+</div>
+
+<div class="card">
   <h2>Загрузить НОВИНКИ</h2>
-  <p class="muted" style="margin-top:-6px">Файлы новинок по брендам (.xlsx и .xlsb). Добавят артикулы,
-     которых ещё нет в TRANSIT. Можно выбрать сразу несколько файлов.</p>
+  <p class="muted" style="margin-top:-6px">Файлы новинок по брендам (.xlsx и .xlsb). Бренд определяется из имени файла.
+     Добавят артикулы, которых ещё нет в TRANSIT. Можно выбрать сразу несколько файлов.</p>
   <form method="post" action="/references/novinki" enctype="multipart/form-data"
         style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
     <input type="file" name="files" accept=".xlsx,.xlsb" multiple required style="flex:1; min-width:220px">
