@@ -24,6 +24,28 @@ created_admin = db.ensure_admin()
 if created_admin:
     print(f"[init] Создан первый пользователь: {created_admin} / (пароль из ADMIN_PASSWORD или 'admin')")
 
+def _lan_ip() -> str:
+    """Локальный IP компьютера в офисной сети (для адреса коллегам)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
+
+
+_port = os.getenv("PORT", "8000")
+print("\n" + "=" * 54)
+print("  📦  Трекер поставок — сервер запускается")
+print(f"  На ЭТОМ компьютере:   http://127.0.0.1:{_port}")
+print(f"  Коллегам в сети дать: http://{_lan_ip()}:{_port}")
+print("  (чтобы остановить — закрой это окно)")
+print("=" * 54 + "\n")
+
 app = FastAPI(title="Трекер поставок")
 app.add_middleware(
     SessionMiddleware,
@@ -214,4 +236,5 @@ def add_user(request: Request, username: str = Form(...), password: str = Form(.
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # host 0.0.0.0 — чтобы коллеги в офисной сети тоже могли подключиться
+    uvicorn.run(app, host="0.0.0.0", port=int(_port))
