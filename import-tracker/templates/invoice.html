@@ -61,25 +61,26 @@
 <div class="card">
   <h2>Данные инвойса</h2>
   <table class="info">
-    <tr><td class="k">Поставщик</td><td class="v" colspan="3">{{ invoice.supplier or "—" }}</td></tr>
     <tr>
+      <td class="k">Поставщик</td><td class="v">{{ invoice.supplier or "—" }}</td>
       <td class="k">Дата инвойса</td><td class="v">{{ invoice.inv_date or "—" }}</td>
-      <td class="k">Валюта</td><td class="v">{{ invoice.currency or "—" }}</td>
     </tr>
     <tr>
       <td class="k">Условия поставки</td><td class="v">{{ invoice.incoterms or "—" }}</td>
+      <td class="k">Валюта</td><td class="v">{{ invoice.currency or "—" }}</td>
+    </tr>
+    <tr>
       <td class="k">Сумма к оплате</td><td class="v">{{ invoice.amount or "—" }} {{ invoice.currency or "" }}</td>
-    </tr>
-    <tr>
       <td class="k">№ упаковочного листа</td><td class="v">{{ invoice.packing_list_no or "—" }}</td>
-      <td class="k">Паллеты / коробки</td><td class="v">{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</td>
     </tr>
     <tr>
+      <td class="k">Паллеты / коробки</td><td class="v">{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</td>
       <td class="k">Вес нетто / брутто</td><td class="v">{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }} кг</td>
-      <td class="k">ИНН получателя</td><td class="v">{{ invoice.inn or "—" }}</td>
     </tr>
-    <tr><td class="k">Получатель</td><td class="v" colspan="3">{{ invoice.consignee or "—" }}</td></tr>
-    <tr><td class="k">Контракт</td><td class="v" colspan="3">{{ invoice.contract or "—" }}</td></tr>
+    <tr>
+      <td class="k">Получатель</td><td class="v">{{ invoice.consignee or "—" }}{% if invoice.inn %} (ИНН {{ invoice.inn }}){% endif %}</td>
+      <td class="k">Контракт</td><td class="v">{{ invoice.contract or "—" }}</td>
+    </tr>
   </table>
 </div>
 

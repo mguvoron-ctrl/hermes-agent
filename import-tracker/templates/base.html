@@ -161,12 +161,14 @@
 
     /* данные инвойса — таблица с ячейками (единый стиль с таблицей товаров) */
     table.info{width:100%; border-collapse:collapse; border:1px solid var(--line);
-      border-radius:11px; overflow:hidden}
-    table.info td{border:1px solid #e7ebf0; padding:12px 13px; font-size:14px; vertical-align:top}
-    table.info td.k{background:#eef2f7; color:#525c6b; width:190px; white-space:nowrap}
+      border-radius:11px; overflow:hidden; table-layout:fixed}
+    table.info td{border:1px solid #e7ebf0; padding:12px 13px; font-size:14px;
+      vertical-align:top; overflow-wrap:break-word}
+    table.info td.k{background:#eef2f7; color:#525c6b; width:190px}
     table.info td.v{color:var(--ink)}
     @media(max-width:620px){
-      table.info td.k{width:140px; white-space:normal}
+      table.info{table-layout:auto}
+      table.info td.k{width:140px}
     }
 
     /* карточки этапов */
