@@ -68,7 +68,7 @@
 </div>
 {% endif %}
 
-{% if camion_done %}
+{% if has_source %}
 <div class="card collapsible" id="card-info">
   <div class="card-head">
     <span class="chev">▾</span>
@@ -100,7 +100,9 @@
   </table>
   </div>{# /card-body #}
 </div>
+{% endif %}{# /has_source: Данные инвойса #}
 
+{% if camion_done %}
 <div class="card collapsible" id="card-goods">
   <div class="card-head">
     <span class="chev">▾</span>
