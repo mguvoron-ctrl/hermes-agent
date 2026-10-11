@@ -139,7 +139,8 @@ def add_shipment(request: Request, number: str = Form(...), title: str = Form(""
 
 
 @app.get("/shipments/{shipment_id}", response_class=HTMLResponse)
-def shipment_detail(request: Request, shipment_id: int, user=Depends(require_user)):
+def shipment_detail(request: Request, shipment_id: int, err: str = "",
+                    user=Depends(require_user)):
     shipment = db.get_shipment(shipment_id)
     if not shipment:
         raise HTTPException(404, "Поставка не найдена")
@@ -147,7 +148,8 @@ def shipment_detail(request: Request, shipment_id: int, user=Depends(require_use
     rows = [{"inv": inv, "progress": db.progress(inv["id"])} for inv in invoices]
     return templates.TemplateResponse(
         request, "shipment.html",
-        {"user": user, "shipment": shipment, "rows": rows, "nav": "shipments"},
+        {"user": user, "shipment": shipment, "rows": rows, "nav": "shipments",
+         "err": err},
     )
 
 
@@ -234,16 +236,43 @@ def _apply_parsed(invoice_id: int, shipment, invoice, parsed: dict,
             db.update_step(s["id"], "готово", "получено из Excel-файла")
 
 
+def _err_redirect(shipment_id: int, msg: str):
+    from urllib.parse import quote
+    return RedirectResponse(f"/shipments/{shipment_id}?err={quote(msg)}", status_code=302)
+
+
 @app.post("/shipments/{shipment_id}/import")
 async def import_invoice(request: Request, shipment_id: int,
                          f: UploadFile = File(...), user=Depends(require_user)):
-    """Создать инвойс, разобрав присланный Excel-файл поставщика."""
+    """Создать инвойс, разобрав присланный Excel-файл поставщика.
+    В поставку загружается ТОЛЬКО инвойс поставщика (не Камьён и не прочее)."""
     shipment = db.get_shipment(shipment_id)
     if not shipment:
         raise HTTPException(404, "Поставка не найдена")
 
+    name = (f.filename or "").lower()
+    if not name.endswith((".xlsx", ".xlsm")):
+        return _err_redirect(shipment_id,
+            "Поддерживаются только файлы Excel (.xlsx/.xlsm) — инвойс поставщика.")
+
     data = await f.read()
-    parsed = _parse_xlsx(data)
+    try:
+        parsed = _parse_xlsx(data)
+    except Exception as e:
+        print("import parse error:", repr(e))
+        return _err_redirect(shipment_id,
+            "Не удалось прочитать файл. Убедись, что это инвойс поставщика в Excel "
+            "(.xlsx) и он не защищён паролем.")
+
+    if parsed.get("format") == "camion":
+        return _err_redirect(shipment_id,
+            "Это похоже на Камьён, а в поставку загружается только ИНВОЙС поставщика. "
+            "Камьён загружается внутри инвойса, на этапе 4.")
+    if not parsed.get("items") and not parsed.get("fields"):
+        return _err_redirect(shipment_id,
+            "Файл не распознан как инвойс поставщика. Проверь, что это исходный файл "
+            "инвойса (FAC-IN / Packing list / Перевод).")
+
     number = parsed["fields"].get("number") or os.path.splitext(f.filename)[0]
 
     try:
@@ -266,13 +295,29 @@ async def import_invoice(request: Request, shipment_id: int,
 @app.post("/invoices/{invoice_id}/reimport")
 async def reimport_invoice(request: Request, invoice_id: int,
                            f: UploadFile = File(...), user=Depends(require_user)):
-    """Заменить исходный Excel и ПЕРЕСЧИТАТЬ данные/товары инвойса."""
+    """Заменить исходный Excel (инвойс поставщика) и пересчитать данные/поля."""
+    from urllib.parse import quote
     invoice = db.get_invoice(invoice_id)
     if not invoice:
         raise HTTPException(404, "Инвойс не найден")
     shipment = db.get_shipment(invoice["shipment_id"])
+    name = (f.filename or "").lower()
+    if not name.endswith((".xlsx", ".xlsm")):
+        return RedirectResponse(
+            f"/invoices/{invoice_id}?err={quote('Нужен файл инвойса в Excel (.xlsx/.xlsm).')}",
+            status_code=302)
     data = await f.read()
-    parsed = _parse_xlsx(data)
+    try:
+        parsed = _parse_xlsx(data)
+    except Exception as e:
+        print("reimport parse error:", repr(e))
+        return RedirectResponse(
+            f"/invoices/{invoice_id}?err={quote('Не удалось прочитать файл (проверь, что это инвойс в Excel без пароля).')}",
+            status_code=302)
+    if parsed.get("format") == "camion":
+        return RedirectResponse(
+            f"/invoices/{invoice_id}?err={quote('Это Камьён. Его загружай на этапе 4, а здесь — исходный инвойс поставщика.')}",
+            status_code=302)
     _apply_parsed(invoice_id, shipment, invoice, parsed, f.filename, data, user,
                   replace_source=True)
     return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
@@ -281,7 +326,7 @@ async def reimport_invoice(request: Request, invoice_id: int,
 # --- Инвойс (шаги + файлы) -------------------------------------------------
 @app.get("/invoices/{invoice_id}", response_class=HTMLResponse)
 def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
-                   user=Depends(require_user)):
+                   err: str = "", user=Depends(require_user)):
     invoice = db.get_invoice(invoice_id)
     if not invoice:
         raise HTTPException(404, "Инвойс не найден")
@@ -324,7 +369,7 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
             "statuses": db.STATUSES, "items": items, "totals": totals,
             "vsummary": vsummary, "camion_updated": camion,
             "kits": kits, "items_json": items_json, "nav": "invoices",
-            "has_source": has_source, "camion_done": camion_done,
+            "has_source": has_source, "camion_done": camion_done, "err": err,
         },
     )
 

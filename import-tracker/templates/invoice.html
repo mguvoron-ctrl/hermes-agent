@@ -12,6 +12,10 @@
   {% if invoice.amount %} · {{ invoice.amount }} {{ invoice.currency or "" }}{% endif %}
 </p>
 
+{% if err %}
+<div class="card" style="border-color:#f4bcbc; background:#fdecec; color:#9a2a2a">⚠️ {{ err }}</div>
+{% endif %}
+
 {% set done_all = (progress.current == "Закрыто") %}
 <div class="card">
   {% if done_all %}

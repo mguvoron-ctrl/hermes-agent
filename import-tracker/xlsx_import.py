@@ -46,6 +46,15 @@ def _matrix(ws) -> list[list]:
     return [list(row) for row in ws.iter_rows(values_only=True)]
 
 
+def _load_mats(path: str) -> list:
+    """Загружает книгу ОДИН раз в быстром read_only-режиме и возвращает матрицы листов."""
+    wb = load_workbook(path, data_only=True, read_only=True)
+    try:
+        return [_matrix(wb[n]) for n in wb.sheetnames]
+    finally:
+        wb.close()
+
+
 def _cell(m: list[list], i: int, j: int):
     if 0 <= i < len(m) and 0 <= j < len(m[i]):
         return m[i][j]
@@ -318,11 +327,10 @@ def parse_any(path: str) -> dict:
     """Определяет формат файла (инвойс поставщика или готовый Камьён) и разбирает."""
     if load_workbook is None:
         return {"fields": {}, "items": [], "warnings": ["openpyxl не установлен"], "format": "invoice"}
-    wb = load_workbook(path, data_only=True)
-    mats = [_matrix(wb[n]) for n in wb.sheetnames]
+    mats = _load_mats(path)
     if _is_camion(mats):
         return parse_camion(mats)
-    r = parse_invoice(path)
+    r = _parse_invoice_mats(mats)
     r["format"] = "invoice"
     return r
 
@@ -331,10 +339,10 @@ def parse_invoice(path: str) -> dict:
     """Главная функция. Возвращает {'fields': {...}, 'items': [...], 'warnings': [...]}."""
     if load_workbook is None:
         return {"fields": {}, "items": [], "warnings": ["openpyxl не установлен"]}
+    return _parse_invoice_mats(_load_mats(path))
 
-    wb = load_workbook(path, data_only=True)
-    mats = [_matrix(wb[n]) for n in wb.sheetnames]
 
+def _parse_invoice_mats(mats: list) -> dict:
     def _header_text(m) -> str:
         """Строка-заголовок товарной таблицы (код + кол-во), нормализованная."""
         for row in m[:45]:

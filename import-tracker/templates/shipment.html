@@ -8,11 +8,18 @@
   В одной поставке может быть несколько инвойсов. Добавляй их сюда — по одному.
 </p>
 
+{% if err %}
+<div class="card" style="border-color:#f4bcbc; background:#fdecec; color:#9a2a2a">
+  ⚠️ {{ err }}
+</div>
+{% endif %}
+
 <div class="card" style="border-color:#d3dffb; background:#f6f9ff">
   <h2>📥 Добавить инвойс из Excel</h2>
-  <p class="muted" style="margin-top:-6px">Присланный поставщиком файл (FAC-IN / Packing list / Перевод).
-     Система сама создаст инвойс, заполнит поля, товары и сохранит оригинал.
-     Чтобы добавить ещё один инвойс — загрузи следующий файл.</p>
+  <p class="muted" style="margin-top:-6px">Сюда загружается <b>только инвойс поставщика</b>
+     (один файл: FAC-IN / Packing list / Перевод) — не Камьён и не другие файлы.
+     Система создаст инвойс, заполнит данные и сохранит оригинал. Камьён загружается
+     позже, внутри инвойса, на этапе 4. Чтобы добавить ещё инвойс — загрузи следующий файл.</p>
   <form method="post" action="/shipments/{{ shipment.id }}/import"
         enctype="multipart/form-data" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
     <input type="file" name="f" accept=".xlsx,.xlsm" required style="flex:1; min-width:220px">
