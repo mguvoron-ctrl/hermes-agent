@@ -62,22 +62,9 @@
 {# --- Предварительный Камьён: пока Камьён не приложен к этапу 4 --- #}
 {% if has_source and not camion_done %}
 <div class="card" style="border-color:#ffe2b8; background:#fffaf2">
-  <h2>🧾 Предварительный Камьён</h2>
-  <p class="muted" style="margin-top:-8px">Исходный Excel загружен — система собрала
-     <b>предварительный Камьён</b> из инвойса, пакинг-листа и перевода: страна,
-     производитель и русское название подтянуты из справочника, а спорные значения
-     подсвечены жёлтым/красным. Скачай его, проверь и доработай, затем приложи
-     готовый файл к этапу <b>4. Камьён</b> ниже — после этого откроется таблица товаров.</p>
   <a class="btn" href="/invoices/{{ invoice.id }}/camion.xlsx">⬇️ Скачать предварительный Камьён (Excel)</a>
-  {% if vsummary.checked and (vsummary.bad or vsummary.warn) %}
-  <div class="ed-hint" style="margin-top:10px">В предварительном файле подсвечено:
-    {% if vsummary.bad %}<span class="pill bad">🔴 {{ vsummary.bad }} с ошибкой</span>{% endif %}
-    {% if vsummary.warn %}<span class="pill warn">🟡 {{ vsummary.warn }} под вопросом</span>{% endif %}
-  </div>
-  {% elif not vsummary.checked %}
-  <div class="ed-hint" style="margin-top:10px">Справочник не загружен — автосверка кодов недоступна.
-    <a href="/references">Загрузить TRANSIT/Новинки</a></div>
-  {% endif %}
+  <p class="muted" style="margin-bottom:0; margin-top:10px">Доработай файл и приложи его к этапу
+     <b>4. Камьён</b> ниже — после этого откроются все данные инвойса на основе исправленного Камьёна.</p>
 </div>
 {% endif %}
 
