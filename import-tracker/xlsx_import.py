@@ -11,6 +11,7 @@ Packing list / Инвойс перевод) → структурированны
 
 from __future__ import annotations
 import re
+import zipfile
 import datetime as _dt
 
 try:
@@ -42,8 +43,30 @@ def _fmt(v) -> str:
     return str(v).strip()
 
 
-def _matrix(ws) -> list[list]:
-    return [list(row) for row in ws.iter_rows(values_only=True)]
+def _matrix(ws, max_rows: int = 50000, max_cols: int = 128,
+            max_blank_run: int = 300) -> list[list]:
+    """Читает лист потоково, с жёсткими ограничениями на размер — иначе файлы
+    с раздутой «используемой областью» разбираются секундами:
+      - max_cols: берём только первые N столбцов (у инвойса/Камьёна осмысленных
+        столбцов ≤ ~20; бывают листы шириной во все 16384 колонки);
+      - max_blank_run: останавливаемся после длинной череды пустых строк
+        (бывает раздутие на сотни тысяч строк).
+    Инвойсы не содержат сотен пустых строк подряд и десятков значимых столбцов
+    за пределами N, поэтому ограничения безопасны."""
+    out: list[list] = []
+    blanks = 0
+    for row in ws.iter_rows(values_only=True, max_col=max_cols):
+        out.append(list(row))
+        if any(c not in (None, "") for c in row):
+            blanks = 0
+        else:
+            blanks += 1
+            if blanks >= max_blank_run:
+                del out[-blanks:]      # отбрасываем хвостовую череду пустых
+                break
+        if len(out) >= max_rows:
+            break
+    return out
 
 
 def _trim(mat: list) -> list:
@@ -56,11 +79,49 @@ def _trim(mat: list) -> list:
     return mat[:last + 1]
 
 
-def _load_mats(path: str) -> list:
-    """Загружает книгу ОДИН раз в быстром read_only-режиме и возвращает матрицы листов."""
+_MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+
+def _sheet_sizes_by_name(path: str) -> dict:
+    """{имя_листа: размер_его_XML_в_байтах} — чтобы пропускать патологически
+    раздутые листы (бывает лист шириной во все 16384 колонки, его XML — десятки
+    МБ, а полезных данных нет). Сопоставление имя→файл берём из связей книги."""
+    import xml.etree.ElementTree as ET
+    try:
+        with zipfile.ZipFile(path) as zf:
+            part_size = {i.filename: i.file_size for i in zf.infolist()}
+            rels = {}
+            rx = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+            for rel in rx:
+                tgt = (rel.get("Target") or "").lstrip("/")
+                if tgt and not tgt.startswith("xl/"):
+                    tgt = "xl/" + tgt.lstrip("./")
+                rels[rel.get("Id")] = tgt
+            out = {}
+            wbx = ET.fromstring(zf.read("xl/workbook.xml"))
+            for sh in wbx.iter(f"{{{_MAIN_NS}}}sheet"):
+                rid = sh.get(f"{{{_REL_NS}}}id")
+                out[sh.get("name")] = part_size.get(rels.get(rid, ""), 0)
+            return out
+    except Exception:
+        return {}
+
+
+def _load_mats(path: str, sheet_xml_limit: int = 8_000_000) -> list:
+    """Загружает книгу ОДИН раз в быстром read_only-режиме и возвращает матрицы
+    листов. Листы с XML крупнее порога пропускаются (это почти всегда «мусорный»
+    лист с раздутой используемой областью, не данные инвойса)."""
+    sizes = _sheet_sizes_by_name(path)
     wb = load_workbook(path, data_only=True, read_only=True)
     try:
-        return [_trim(_matrix(wb[n])) for n in wb.sheetnames]
+        mats = []
+        for n in wb.sheetnames:
+            if sizes.get(n, 0) > sheet_xml_limit:
+                mats.append([])          # пропускаем раздутый лист
+            else:
+                mats.append(_trim(_matrix(wb[n])))
+        return mats
     finally:
         wb.close()
 
