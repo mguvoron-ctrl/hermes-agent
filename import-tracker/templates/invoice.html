@@ -37,7 +37,7 @@
 </div>
 
 {# --- Исходный Excel (один файл: Инвойс + Пакинг лист + Перевод) --- #}
-<div class="card" style="border-color:#e6d9bf; background:#fdf8ef">
+<div class="card" style="border-color:#cfe0ff; background:#f5f9ff">
   <h2>📄 Исходный Excel</h2>
   <p class="muted" style="margin-top:-8px">Один файл содержит Инвойс, Пакинг лист и Перевод.
      По нему заполняются данные инвойса и собирается <b>предварительный Камьён</b> (кнопка ниже).
@@ -65,7 +65,7 @@
 
 {# --- Предварительный Камьён: пока Камьён не приложен к этапу 4 --- #}
 {% if has_source and not camion_done %}
-<div class="card" style="border-color:#ffe2b8; background:#fffaf2">
+<div class="card" style="border-color:#b9d2ff; background:#eef5ff">
   <a class="btn" href="/invoices/{{ invoice.id }}/camion.xlsx">⬇️ Скачать предварительный Камьён (Excel)</a>
   <p class="muted" style="margin-bottom:0; margin-top:10px">Доработай файл и приложи его к этапу
      <b>4. Камьён</b> ниже — после этого откроются все данные инвойса на основе исправленного Камьёна.</p>

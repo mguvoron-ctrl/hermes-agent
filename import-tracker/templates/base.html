@@ -9,18 +9,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
-      /* тёплая современная палитра: кремовый фон, медный акцент, эспрессо-шапка */
-      --bg:#f7f3ec; --card:#fffdf9; --ink:#2b2720; --muted:#8c8273;
-      --line:#ece3d5; --line2:#f3ede2;
-      --accent:#b06a2c; --accent-2:#c27e3a; --accent-weak:#f6ead6; --accent-ring:rgba(176,106,44,.22);
-      --thead:#f3ebdd; --thead-ink:#7c6f5b; --thead-line:#e4d8c3;
-      --hover:#faf4ea;
-      --ok:#2f8f55; --ok-bg:#e6f3e9;
-      --work:#bb7a1e; --work-bg:#f9edcf;
-      --wait:#9a8f80; --wait-bg:#efe8dd;
-      --danger:#cf4b43;
-      --shadow:0 1px 2px rgba(70,50,25,.05),0 4px 14px rgba(90,65,30,.06);
-      --shadow-lg:0 10px 26px rgba(90,65,30,.13);
+      /* бело-голубая современная палитра */
+      --bg:#eef4fc; --card:#ffffff; --ink:#15233a; --muted:#64748b;
+      --line:#e1e9f3; --line2:#eef3f9;
+      --accent:#2563eb; --accent-2:#3b82f6; --accent-weak:#e6f0ff; --accent-ring:rgba(37,99,235,.22);
+      --thead:#eef4fc; --thead-ink:#56657c; --thead-line:#d6e2f1;
+      --hover:#f2f7fe;
+      --ok:#15924f; --ok-bg:#e3f6ec;
+      --work:#c67806; --work-bg:#fcf1dd;
+      --wait:#8794a7; --wait-bg:#eef2f7;
+      --danger:#e24a4a;
+      --shadow:0 1px 2px rgba(20,40,80,.05),0 4px 14px rgba(20,50,100,.07);
+      --shadow-lg:0 12px 28px rgba(20,50,110,.16);
     }
     *{box-sizing:border-box}
     html,body{margin:0}
@@ -32,19 +32,23 @@
     a:hover{text-decoration:underline}
 
     header.topbar{
-      background:linear-gradient(100deg,#2e2419,#3a2d1e); color:#f3ece0; padding:0 22px; height:54px;
+      background:linear-gradient(105deg,#1e3a8a 0%,#2563eb 55%,#3b82f6 100%);
+      color:#eaf2ff; padding:0 24px; height:60px;
       display:flex; align-items:center; gap:4px; position:sticky; top:0; z-index:10;
-      box-shadow:0 1px 0 rgba(0,0,0,.15), 0 4px 16px rgba(60,40,15,.12);
+      box-shadow:0 2px 0 rgba(255,255,255,.08) inset, 0 6px 20px rgba(20,50,120,.28);
+      border-bottom:1px solid rgba(255,255,255,.12);
     }
-    .topbar .brand{font-weight:700; font-size:16px; margin-right:18px; color:#fff; letter-spacing:.01em}
+    .topbar .brand{font-weight:800; font-size:17px; margin-right:22px; color:#fff;
+      letter-spacing:.01em; text-shadow:0 1px 1px rgba(0,0,0,.18)}
     .topbar nav a{
-      color:#dcccb4; padding:8px 13px; border-radius:9px; font-size:14px; font-weight:500;
+      color:#cfe0fb; padding:9px 14px; border-radius:10px; font-size:14px; font-weight:600;
       transition:background .12s,color .12s;
     }
-    .topbar nav a:hover{background:rgba(255,255,255,.08); color:#fff; text-decoration:none}
-    .topbar nav a.active{background:rgba(217,160,80,.22); color:#fff; box-shadow:inset 0 0 0 1px rgba(217,160,80,.35)}
+    .topbar nav a:hover{background:rgba(255,255,255,.14); color:#fff; text-decoration:none}
+    .topbar nav a.active{background:rgba(255,255,255,.95); color:#1e40af;
+      box-shadow:0 2px 8px rgba(10,30,80,.22)}
     .topbar .spacer{flex:1}
-    .topbar .who{color:#bda889; font-size:13px; margin-right:12px}
+    .topbar .who{color:#bcd2f5; font-size:13px; margin-right:12px}
 
     .wrap{max-width:1800px; margin:24px auto; padding:0 28px}
     .card{
@@ -81,7 +85,7 @@
 
     /* точки-этапы */
     .dots{display:inline-flex; gap:3px; align-items:center}
-    .dots i{width:7px; height:7px; border-radius:50%; background:#e3d9c8; display:inline-block}
+    .dots i{width:7px; height:7px; border-radius:50%; background:#d5e0ee; display:inline-block}
     .dots i.done{background:var(--ok)}
     .dots i.now{background:var(--accent); box-shadow:0 0 0 2px var(--accent-weak)}
     .steptxt{color:var(--muted); font-size:12.5px; margin-left:8px}
@@ -102,8 +106,8 @@
     .btn:hover{filter:brightness(1.06)}
     .btn:active{transform:translateY(1px)}
     .btn.sm{padding:6px 11px; font-size:13px; font-weight:600; border-radius:9px}
-    .btn.ghost{background:#f0e7d8; color:var(--ink); box-shadow:none}
-    .btn.ghost:hover{background:#e9decb}
+    .btn.ghost{background:#e9f1fc; color:var(--ink); box-shadow:none}
+    .btn.ghost:hover{background:#dce8f8}
     .btn.danger{background:linear-gradient(180deg,#db5a52,var(--danger))}
     .row{display:flex; gap:12px; flex-wrap:wrap}
     .row>*{flex:1; min-width:150px}
@@ -136,18 +140,18 @@
           width:28px; height:28px; border-radius:8px; font-size:14px; font-weight:700}
     .cell.ok{background:var(--ok-bg); color:var(--ok)}
     .cell.now{background:var(--accent-weak); color:var(--accent)}
-    .cell.wait{color:#d2c7b4; font-weight:400}
+    .cell.wait{color:#c3cedd; font-weight:400}
     .legend{display:flex; gap:18px; flex-wrap:wrap; color:var(--muted); font-size:12.5px; margin-top:12px}
     .legend span{display:inline-flex; align-items:center; gap:6px}
 
     /* полосатая таблица товаров + итоги + мягкая сетка ячеек */
-    table.striped tbody tr:nth-child(odd){background:#faf6ee}
+    table.striped tbody tr:nth-child(odd){background:#f6f9ff}
     table.striped tbody tr:hover{background:var(--hover)}
     table.striped th, table.striped td{border-right:1px solid var(--line)}
     table.striped th:last-child, table.striped td:last-child{border-right:none}
     table.striped tbody td{border-bottom:1px solid var(--line); vertical-align:top}
-    table.striped tfoot td{font-weight:700; border-top:2px solid #ddd0bc;
-      border-bottom:none; padding:13px 12px; background:#f2ebdd}
+    table.striped tfoot td{font-weight:700; border-top:2px solid #cfddf0;
+      border-bottom:none; padding:13px 12px; background:#eef4fc}
     /* колонки таблицы товаров */
     .goods td, .goods th{min-width:66px}
     .goods td.nm-ru{min-width:230px; font-weight:500; color:var(--ink)}
@@ -169,13 +173,13 @@
     .ed-grid input:focus{outline:none; border-color:var(--accent);
       box-shadow:0 0 0 2px var(--accent-ring); background:#fff}
     .ed-grid input.wide{min-width:200px}
-    .ed-grid td.ro{padding:5px 8px; color:#6a6052; font-size:12.5px; white-space:nowrap; background:#faf6ee}
+    .ed-grid td.ro{padding:5px 8px; color:#5b6b82; font-size:12.5px; white-space:nowrap; background:#f6f9ff}
     .ed-grid .rowdel{color:var(--danger); cursor:pointer; text-align:center; font-weight:700; user-select:none}
     /* строка «Итого» — выделена, чтобы отличалась от таблицы */
-    .ed-grid tfoot td{background:var(--accent-weak); border-top:2px solid #e3c9a3; font-weight:700;
-      color:#5a4327; padding:8px 8px; font-size:12.5px}
+    .ed-grid tfoot td{background:var(--accent-weak); border-top:2px solid #b9ccea; font-weight:700;
+      color:#26477c; padding:8px 8px; font-size:12.5px}
     .ed-grid tfoot td.tfoot-lab{text-align:right; text-transform:uppercase; letter-spacing:.04em;
-      color:#9a6a2a; font-size:11px}
+      color:#4a5f86; font-size:11px}
     .ed-grid tfoot td.tfoot-val{text-align:left}
     .ed-hint{color:var(--muted); font-size:12.5px; margin:8px 0}
 
@@ -200,8 +204,8 @@
       padding:16px 18px; text-decoration:none; color:var(--ink); box-shadow:var(--shadow);
       transition:transform .12s, box-shadow .12s, border-color .12s; position:relative; overflow:hidden}
     .tile:hover{transform:translateY(-3px); box-shadow:var(--shadow-lg);
-      border-color:#e3cda4; text-decoration:none}
-    .tile.active{border-color:var(--accent); background:linear-gradient(180deg,#fbf1e2,#fff)}
+      border-color:#bcd2f5; text-decoration:none}
+    .tile.active{border-color:var(--accent); background:linear-gradient(180deg,#eef5ff,#fff)}
     .tile .nm{display:flex; align-items:center; gap:7px; font-weight:650; font-size:14.5px}
     .tile .nm .ic{font-size:18px}
     .tile .num{font-size:30px; font-weight:800; letter-spacing:-.02em; margin-top:10px; line-height:1; color:var(--accent)}
@@ -234,8 +238,8 @@
     /* карточки этапов */
     .step{padding:12px 14px; border:1px solid var(--line); border-radius:12px; margin-bottom:9px;
       transition:border-color .12s, background .12s}
-    .step.current{border-color:#e6cfa6; background:linear-gradient(180deg,#fdf6ea,#fffdf9)}
-    .step.done{background:#fbfaf4}
+    .step.current{border-color:#c6d9f7; background:linear-gradient(180deg,#f3f8ff,#ffffff)}
+    .step.done{background:#fbfdff}
     .step-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
     .step-head .nm{font-weight:650}
     .step-head .acts{margin-left:auto; display:flex; gap:6px}
