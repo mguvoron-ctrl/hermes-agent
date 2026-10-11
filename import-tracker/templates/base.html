@@ -163,6 +163,12 @@
     .ed-grid input.wide{min-width:200px}
     .ed-grid td.ro{padding:5px 8px; color:#555; font-size:12.5px; white-space:nowrap; background:#fafbfc}
     .ed-grid .rowdel{color:var(--danger); cursor:pointer; text-align:center; font-weight:700; user-select:none}
+    /* строка «Итого» — выделена, чтобы отличалась от таблицы */
+    .ed-grid tfoot td{background:#e8eefb; border-top:2px solid #b9c8e6; font-weight:700;
+      color:#243; padding:8px 8px; font-size:12.5px}
+    .ed-grid tfoot td.tfoot-lab{text-align:right; text-transform:uppercase; letter-spacing:.04em;
+      color:#4a5a7a; font-size:11px}
+    .ed-grid tfoot td.tfoot-val{text-align:left}
     .ed-hint{color:var(--muted); font-size:12.5px; margin:8px 0}
 
     /* сворачиваемые карточки (раскрывающийся список) */

@@ -337,7 +337,6 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
     for f in files:
         files_by_step.setdefault(f["step_id"], []).append(f)
     items = db.get_items(invoice_id)
-    totals = _item_totals(items)
     vitems, vsummary = validate_items(items)
     kits = _build_kits(invoice_id, items)
     # Данные для встроенного редактора товаров: значения из сверки
@@ -366,7 +365,7 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
             "user": user, "invoice": invoice,
             "shipment": shipment, "steps": steps,
             "files_by_step": files_by_step, "progress": db.progress(invoice_id),
-            "statuses": db.STATUSES, "items": items, "totals": totals,
+            "statuses": db.STATUSES, "items": items,
             "vsummary": vsummary, "camion_updated": camion,
             "kits": kits, "items_json": items_json, "nav": "invoices",
             "has_source": has_source, "camion_done": camion_done, "err": err,
@@ -487,19 +486,6 @@ def save_invoice_fields(request: Request, invoice_id: int, data: str = Form(...)
     return JSONResponse({"ok": True})
 
 
-def _num(x) -> float:
-    try:
-        return float(str(x).replace(" ", "").replace(",", "."))
-    except (ValueError, TypeError):
-        return 0.0
-
-
-def _fmt_num(x: float) -> str:
-    if x == int(x):
-        return f"{int(x):,}".replace(",", " ")
-    return f"{x:,.2f}".replace(",", " ")
-
-
 def _set_count(v) -> int:
     try:
         return int(float(str(v or "1").replace(",", ".")))
@@ -525,16 +511,6 @@ def _build_kits(invoice_id: int, items) -> list:
             "barcode": it["barcode"] or "", "n": n, "rows": rows,
         })
     return kits
-
-
-def _item_totals(items) -> dict:
-    return {
-        "qty": _fmt_num(sum(_num(it["qty"]) for it in items)),
-        "total_price": _fmt_num(sum(_num(it["total_price"]) for it in items)),
-        "net": _fmt_num(sum(_num(it["net_weight"]) for it in items)),
-        "gross": _fmt_num(sum(_num(it["gross_weight"]) for it in items)),
-        "boxes": _fmt_num(sum(_num(it["box_count"]) for it in items)),
-    }
 
 
 @app.post("/invoices/{invoice_id}/kit")

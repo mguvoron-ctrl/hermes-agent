@@ -162,13 +162,7 @@
   {% endif %}
 
   <div id="goods-edit" style="margin-top:12px">
-    <p class="ed-hint">Правь ячейки прямо здесь — изменения сохраняются автоматически.
-       Можно вставить данные из Excel: скопируй диапазон и вставь (Ctrl+V) в нужную ячейку —
-       заполнится сразу несколько ячеек и строк. Столбец «Производитель» заполняется из справочника.
-       <b>Камьён на этапе 4 собирается из этой таблицы</b> — он всегда актуальный.</p>
     <div class="scroll-x" style="border:none"><div id="goods-editor"></div></div>
-    <div class="ed-hint" style="margin-top:8px">Итого: кол-во {{ totals.qty }} · сумма {{ totals.total_price }}
-       · нетто {{ totals.net }} · брутто {{ totals.gross }} · коробки {{ totals.boxes }}</div>
     <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
       <button class="btn sm ghost" type="button" onclick="addGoodRow()">+ строка</button>
     </div>
@@ -188,8 +182,8 @@ const GOODS_COLS=[
   {k:'name_en',l:'Название (англ)',wide:true},
   {k:'origin',l:'Страна',st:'origin_st'},
   {k:'producer',l:'Производитель',ro:true,st:'prod_st'},
-  {k:'qty',l:'Кол-во'},{k:'unit_price',l:'Цена'},{k:'total_price',l:'Сумма'},
-  {k:'net_weight',l:'Нетто'},{k:'gross_weight',l:'Брутто'},{k:'box_count',l:'Коробки'},
+  {k:'qty',l:'Кол-во',sum:true},{k:'unit_price',l:'Цена'},{k:'total_price',l:'Сумма',sum:true},
+  {k:'net_weight',l:'Нетто',sum:true},{k:'gross_weight',l:'Брутто',sum:true},{k:'box_count',l:'Коробки',sum:true},
   {k:'set_count',l:'Сост.'}
 ];
 let GOODS_DATA=[];
@@ -215,20 +209,49 @@ function appendRow(body,row){
   body.appendChild(tr);
   return tr;
 }
-function addGoodRow(){ const tr=appendRow(document.getElementById('ged-body'),{}); goodsChanged(); return tr; }
-function delGoodRow(el){ el.parentElement.remove(); goodsChanged(); }
+function addGoodRow(){ const tr=appendRow(document.getElementById('ged-body'),{}); updateTotals(); goodsChanged(); return tr; }
+function delGoodRow(el){ el.parentElement.remove(); updateTotals(); goodsChanged(); }
+
+function fmtNum(x){
+  const r=Math.round(x*100)/100;
+  let i, f='';
+  if(r%1===0){ i=String(r); } else { const p=r.toFixed(2).split('.'); i=p[0]; f=p[1]; }
+  i=i.replace(/\B(?=(\d{3})+(?!\d))/g,' ');   // пробелы-разделители тысяч
+  return f? i+','+f : i;
+}
+function updateTotals(){
+  const sums={};
+  GOODS_COLS.forEach(c=>{ if(c.sum) sums[c.k]=0; });
+  document.querySelectorAll('#ged-body tr').forEach(tr=>{
+    tr.querySelectorAll('input[data-k]').forEach(inp=>{
+      if(sums.hasOwnProperty(inp.dataset.k)){
+        const v=parseFloat(String(inp.value).replace(/\s/g,'').replace(',','.'));
+        if(!isNaN(v)) sums[inp.dataset.k]+=v;
+      }
+    });
+  });
+  document.querySelectorAll('#goods-editor tfoot td[data-t]').forEach(td=>{
+    const k=td.dataset.t;
+    td.textContent = (k && sums.hasOwnProperty(k)) ? fmtNum(sums[k]) : '';
+  });
+}
 
 function buildGoodsEditor(){
   const host=document.getElementById('goods-editor');
   let html='<table class="ed-grid"><thead><tr><th></th>';
   GOODS_COLS.forEach(c=>html+='<th>'+c.l+'</th>');
-  html+='</tr></thead><tbody id="ged-body"></tbody></table>';
+  html+='</tr></thead><tbody id="ged-body"></tbody><tfoot><tr><td class="tfoot-lab" colspan="8">Итого</td>';
+  GOODS_COLS.slice(7).forEach(c=>{
+    html+='<td class="tfoot-val" data-t="'+(c.sum?c.k:'')+'"></td>';
+  });
+  html+='</tr></tfoot></table>';
   host.innerHTML=html;
   const body=document.getElementById('ged-body');
   const data=GOODS_DATA.length?GOODS_DATA:[{}];
   data.forEach(r=>appendRow(body,r));
-  body.addEventListener('input', goodsChanged);
+  body.addEventListener('input', function(){ updateTotals(); goodsChanged(); });
   body.addEventListener('change', function(){ clearTimeout(goodsTimer); saveGoods(); });
+  updateTotals();
   body.addEventListener('paste',function(e){
     const inp=e.target;
     if(!inp||inp.tagName!=='INPUT') return;
@@ -244,6 +267,7 @@ function buildGoodsEditor(){
       cells.forEach((val,ci)=>{ const t=inputs[startIdx+ci]; if(t) t.value=val; });
       tr=tr.nextElementSibling;
     });
+    updateTotals();
     goodsChanged();
   });
 }

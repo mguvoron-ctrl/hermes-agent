@@ -46,11 +46,21 @@ def _matrix(ws) -> list[list]:
     return [list(row) for row in ws.iter_rows(values_only=True)]
 
 
+def _trim(mat: list) -> list:
+    """Отрезает полностью пустые хвостовые строки (у файлов бывает раздутая
+    «используемая область» на тысячи пустых строк — из-за неё всё тормозит)."""
+    last = -1
+    for i, row in enumerate(mat):
+        if any(c not in (None, "") for c in row):
+            last = i
+    return mat[:last + 1]
+
+
 def _load_mats(path: str) -> list:
     """Загружает книгу ОДИН раз в быстром read_only-режиме и возвращает матрицы листов."""
     wb = load_workbook(path, data_only=True, read_only=True)
     try:
-        return [_matrix(wb[n]) for n in wb.sheetnames]
+        return [_trim(_matrix(wb[n])) for n in wb.sheetnames]
     finally:
         wb.close()
 
