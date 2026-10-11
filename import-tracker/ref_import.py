@@ -10,8 +10,6 @@
 
 from __future__ import annotations
 import re
-import tempfile
-import os
 
 try:
     from openpyxl import load_workbook

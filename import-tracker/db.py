@@ -655,13 +655,6 @@ def ref_brands() -> dict:
     return {"transit": tr, "novinki": [dict(r) for r in nv]}
 
 
-def ref_get(article: str):
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM article_ref WHERE article = ?", (article,)).fetchone()
-    conn.close()
-    return row
-
-
 def ref_get_many(articles: list[str]) -> dict:
     """Пакетный поиск: {article: row} для переданных артикулов."""
     if not articles:
