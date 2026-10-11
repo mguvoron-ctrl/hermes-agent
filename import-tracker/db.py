@@ -398,9 +398,24 @@ _INVOICE_COLS = {
 
 
 def set_invoice_fields(invoice_id: int, fields: dict) -> None:
-    """Обновляет только переданные (непустые) поля инвойса."""
+    """Обновляет только переданные (непустые) поля инвойса (слияние при импорте)."""
     cols = {k: v for k, v in fields.items()
             if k in _INVOICE_COLS and v not in (None, "")}
+    if not cols:
+        return
+    sets = ", ".join(f"{k} = ?" for k in cols)
+    conn = get_conn()
+    conn.execute(f"UPDATE invoices SET {sets} WHERE id = ?",
+                 (*cols.values(), invoice_id))
+    conn.commit()
+    conn.close()
+
+
+def update_invoice_fields(invoice_id: int, fields: dict) -> None:
+    """Ручная правка полей инвойса: пишет все переданные поля из белого списка,
+    в т.ч. пустые (чтобы можно было очистить значение)."""
+    cols = {k: ("" if v is None else str(v)) for k, v in fields.items()
+            if k in _INVOICE_COLS and k != "source_file"}
     if not cols:
         return
     sets = ", ".join(f"{k} = ?" for k in cols)

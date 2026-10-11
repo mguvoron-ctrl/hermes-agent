@@ -68,43 +68,71 @@
 </div>
 {% endif %}
 
-{% if camion_done %}
+{% if has_source %}
 <div class="card collapsible" id="card-info">
   <div class="card-head">
     <span class="chev">▾</span>
     <h2>Данные инвойса</h2>
+    <span class="muted save-status" id="info-status" style="font-size:12px"></span>
     <span class="tag-collapsed">— нажми, чтобы раскрыть</span>
   </div>
   <div class="card-body">
-  <table class="info">
+  <p class="ed-hint" style="margin-top:0">Можно править вручную — изменения сохраняются автоматически.</p>
+  <table class="info info-ed" id="info-table">
     <tr>
-      <td class="k">Поставщик</td><td class="v">{{ invoice.supplier or "—" }}</td>
-      <td class="k">Дата инвойса</td><td class="v">{{ invoice.inv_date or "—" }}</td>
+      <td class="k">Поставщик</td><td class="v"><input data-f="supplier" value="{{ invoice.supplier or '' }}"></td>
+      <td class="k">Дата инвойса</td><td class="v"><input data-f="inv_date" value="{{ invoice.inv_date or '' }}"></td>
     </tr>
     <tr>
-      <td class="k">Условия поставки</td><td class="v">{{ invoice.incoterms or "—" }}</td>
-      <td class="k">Валюта</td><td class="v">{{ invoice.currency or "—" }}</td>
+      <td class="k">Условия поставки</td><td class="v"><input data-f="incoterms" value="{{ invoice.incoterms or '' }}"></td>
+      <td class="k">Валюта</td><td class="v"><input data-f="currency" value="{{ invoice.currency or '' }}"></td>
     </tr>
     <tr>
-      <td class="k">Сумма к оплате</td><td class="v">{{ invoice.amount or "—" }} {{ invoice.currency or "" }}</td>
-      <td class="k">№ упаковочного листа</td><td class="v">{{ invoice.packing_list_no or "—" }}</td>
+      <td class="k">Сумма к оплате</td><td class="v"><input data-f="amount" value="{{ invoice.amount or '' }}"></td>
+      <td class="k">№ упаковочного листа</td><td class="v"><input data-f="packing_list_no" value="{{ invoice.packing_list_no or '' }}"></td>
     </tr>
     <tr>
-      <td class="k">Паллеты / коробки</td><td class="v">{{ invoice.pallets or "—" }} / {{ invoice.boxes or "—" }}</td>
-      <td class="k">Вес нетто / брутто</td><td class="v">{{ invoice.net_weight or "—" }} / {{ invoice.gross_weight or "—" }} кг</td>
+      <td class="k">Паллеты</td><td class="v"><input data-f="pallets" value="{{ invoice.pallets or '' }}"></td>
+      <td class="k">Коробки</td><td class="v"><input data-f="boxes" value="{{ invoice.boxes or '' }}"></td>
     </tr>
     <tr>
-      <td class="k">Получатель</td><td class="v">{{ invoice.consignee or "—" }}{% if invoice.inn %} (ИНН {{ invoice.inn }}){% endif %}</td>
-      <td class="k">Контракт</td><td class="v">{{ invoice.contract or "—" }}</td>
+      <td class="k">Вес нетто, кг</td><td class="v"><input data-f="net_weight" value="{{ invoice.net_weight or '' }}"></td>
+      <td class="k">Вес брутто, кг</td><td class="v"><input data-f="gross_weight" value="{{ invoice.gross_weight or '' }}"></td>
+    </tr>
+    <tr>
+      <td class="k">Получатель</td><td class="v"><input data-f="consignee" value="{{ invoice.consignee or '' }}"></td>
+      <td class="k">ИНН</td><td class="v"><input data-f="inn" value="{{ invoice.inn or '' }}"></td>
+    </tr>
+    <tr>
+      <td class="k">Контракт</td><td class="v" colspan="3"><input data-f="contract" value="{{ invoice.contract or '' }}"></td>
     </tr>
   </table>
   </div>{# /card-body #}
 </div>
+<script>
+(function(){
+  var t=document.getElementById('info-table'); if(!t) return;
+  var st=document.getElementById('info-status'), timer=null;
+  function save(){
+    var o={}; t.querySelectorAll('input[data-f]').forEach(function(i){o[i.dataset.f]=i.value;});
+    var fd=new FormData(); fd.append('data', JSON.stringify(o));
+    if(st) st.textContent='сохранение…';
+    fetch('/invoices/{{ invoice.id }}/fields',{method:'POST',body:fd})
+      .then(function(r){ if(st) st.textContent=r.ok?'✓ сохранено':'ошибка сохранения'; })
+      .catch(function(){ if(st) st.textContent='ошибка сети'; });
+  }
+  t.addEventListener('input', function(){ clearTimeout(timer); timer=setTimeout(save,700); });
+  t.addEventListener('change', function(){ clearTimeout(timer); save(); });
+})();
+</script>
+{% endif %}{# /has_source: Данные инвойса #}
 
+{% if camion_done %}
 <div class="card collapsible" id="card-goods">
   <div class="card-head">
     <span class="chev">▾</span>
     <h2>Товары <span class="cnt">({{ items|length }})</span></h2>
+    <span class="muted save-status" id="goods-status" style="font-size:12px"></span>
     <span class="tag-collapsed">— нажми, чтобы раскрыть</span>
   </div>
   <div class="card-body">
@@ -129,21 +157,18 @@
       <a href="/references">Загрузить TRANSIT/Новинки</a></div>
   {% endif %}
 
-  <form id="goods-edit" method="post" action="/invoices/{{ invoice.id }}/items" style="margin-top:12px">
-    <p class="ed-hint">Правь ячейки прямо здесь — изменения сохраняются по кнопке «Сохранить».
+  <div id="goods-edit" style="margin-top:12px">
+    <p class="ed-hint">Правь ячейки прямо здесь — изменения сохраняются автоматически.
        Можно вставить данные из Excel: скопируй диапазон и вставь (Ctrl+V) в нужную ячейку —
        заполнится сразу несколько ячеек и строк. Столбец «Производитель» заполняется из справочника.
-       <b>Камьён на этапе 4 собирается из этой таблицы</b> — после «Сохранить» его файл сразу актуальный.</p>
+       <b>Камьён на этапе 4 собирается из этой таблицы</b> — он всегда актуальный.</p>
     <div class="scroll-x" style="border:none"><div id="goods-editor"></div></div>
-    <input type="hidden" name="data" id="goods-data">
     <div class="ed-hint" style="margin-top:8px">Итого: кол-во {{ totals.qty }} · сумма {{ totals.total_price }}
        · нетто {{ totals.net }} · брутто {{ totals.gross }} · коробки {{ totals.boxes }}</div>
     <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
       <button class="btn sm ghost" type="button" onclick="addGoodRow()">+ строка</button>
-      <span style="flex:1"></span>
-      <button class="btn sm" type="submit" onclick="return collectGoods()">Сохранить</button>
     </div>
-  </form>
+  </div>
   </div>{# /card-body #}
 </div>
 
@@ -172,7 +197,7 @@ function _cls(st){ return st==='bad'?'c-bad':(st==='warn'?'c-warn':''); }
 
 function appendRow(body,row){
   const tr=document.createElement('tr');
-  let html='<td class="rowdel" title="удалить строку" onclick="this.parentElement.remove()">✕</td>';
+  let html='<td class="rowdel" title="удалить строку" onclick="delGoodRow(this)">✕</td>';
   GOODS_COLS.forEach(c=>{
     const st=c.st?_cls(row[c.st]):'';
     const title=(c.ref&&row[c.ref])?(' title="В справочнике: '+_esc(row[c.ref])+'"'):'';
@@ -186,7 +211,8 @@ function appendRow(body,row){
   body.appendChild(tr);
   return tr;
 }
-function addGoodRow(){ return appendRow(document.getElementById('ged-body'),{}); }
+function addGoodRow(){ const tr=appendRow(document.getElementById('ged-body'),{}); goodsChanged(); return tr; }
+function delGoodRow(el){ el.parentElement.remove(); goodsChanged(); }
 
 function buildGoodsEditor(){
   const host=document.getElementById('goods-editor');
@@ -197,6 +223,8 @@ function buildGoodsEditor(){
   const body=document.getElementById('ged-body');
   const data=GOODS_DATA.length?GOODS_DATA:[{}];
   data.forEach(r=>appendRow(body,r));
+  body.addEventListener('input', goodsChanged);
+  body.addEventListener('change', function(){ clearTimeout(goodsTimer); saveGoods(); });
   body.addEventListener('paste',function(e){
     const inp=e.target;
     if(!inp||inp.tagName!=='INPUT') return;
@@ -207,24 +235,35 @@ function buildGoodsEditor(){
     const startIdx=[...tr.querySelectorAll('input')].indexOf(inp);
     const rows=text.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(r=>r.split('\t'));
     rows.forEach(cells=>{
-      if(!tr) tr=addGoodRow();
+      if(!tr) tr=appendRow(document.getElementById('ged-body'),{});
       const inputs=tr.querySelectorAll('input');
       cells.forEach((val,ci)=>{ const t=inputs[startIdx+ci]; if(t) t.value=val; });
       tr=tr.nextElementSibling;
     });
+    goodsChanged();
   });
 }
 
-function collectGoods(){
+// --- автосохранение таблицы товаров ---
+let goodsTimer=null;
+function goodsPayload(){
   const rows=[];
   document.querySelectorAll('#ged-body tr').forEach(tr=>{
     const o={};
     tr.querySelectorAll('input[data-k]').forEach(inp=>{ o[inp.dataset.k]=inp.value; });
     rows.push(o);
   });
-  document.getElementById('goods-data').value=JSON.stringify(rows);
-  return true;
+  return JSON.stringify(rows);
 }
+function saveGoods(){
+  const stt=document.getElementById('goods-status');
+  const fd=new FormData(); fd.append('data', goodsPayload());
+  if(stt) stt.textContent='сохранение…';
+  fetch('/invoices/{{ invoice.id }}/items',{method:'POST',body:fd})
+    .then(function(r){ if(stt) stt.textContent=r.ok?'✓ сохранено':'ошибка сохранения'; })
+    .catch(function(){ if(stt) stt.textContent='ошибка сети'; });
+}
+function goodsChanged(){ clearTimeout(goodsTimer); goodsTimer=setTimeout(saveGoods,700); }
 
 buildGoodsEditor();
 </script>

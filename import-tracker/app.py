@@ -15,7 +15,7 @@ import shutil
 import tempfile
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -413,7 +413,7 @@ def validate_items(items):
 @app.post("/invoices/{invoice_id}/items")
 def save_items(request: Request, invoice_id: int, data: str = Form(...),
                user=Depends(require_user)):
-    """Сохранить вручную отредактированную таблицу товаров."""
+    """Автосохранение таблицы товаров (вызывается из JS, возвращает JSON)."""
     try:
         rows = json.loads(data)
     except (ValueError, TypeError):
@@ -426,7 +426,20 @@ def save_items(request: Request, invoice_id: int, data: str = Form(...),
         if any(it.values()):  # пропускаем полностью пустые строки
             clean.append(it)
     db.replace_items(invoice_id, clean)
-    return RedirectResponse(f"/invoices/{invoice_id}", status_code=302)
+    return JSONResponse({"ok": True, "count": len(clean)})
+
+
+@app.post("/invoices/{invoice_id}/fields")
+def save_invoice_fields(request: Request, invoice_id: int, data: str = Form(...),
+                        user=Depends(require_user)):
+    """Автосохранение вручную правленых полей инвойса (JSON из JS)."""
+    try:
+        fields = json.loads(data)
+    except (ValueError, TypeError):
+        fields = {}
+    if isinstance(fields, dict):
+        db.update_invoice_fields(invoice_id, fields)
+    return JSONResponse({"ok": True})
 
 
 def _num(x) -> float:
