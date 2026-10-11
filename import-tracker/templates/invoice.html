@@ -36,8 +36,8 @@
 <div class="card" style="border-color:#d3dffb; background:#f8faff">
   <h2>📄 Исходный Excel</h2>
   <p class="muted" style="margin-top:-8px">Один файл содержит Инвойс, Пакинг лист и Перевод.
-     При замене данные и таблица товаров пересчитываются автоматически.
-     Можно загрузить и <b>готовый/переделанный Камьён</b> (реестр из 15 колонок) — система распознает формат сама.</p>
+     По нему заполняются данные инвойса и собирается <b>предварительный Камьён</b> (кнопка ниже).
+     Таблица товаров появится после того, как проверенный Камьён будет загружен на этап 4.</p>
   {% set src = files_by_step.get(steps[0].id, []) if steps else [] %}
   {% if src %}
     {% for f in src %}
@@ -68,7 +68,7 @@
 </div>
 {% endif %}
 
-{% if has_source %}
+{% if camion_done %}
 <div class="card collapsible" id="card-info">
   <div class="card-head">
     <span class="chev">▾</span>
@@ -100,9 +100,7 @@
   </table>
   </div>{# /card-body #}
 </div>
-{% endif %}{# /has_source: Данные инвойса #}
 
-{% if camion_done %}
 <div class="card collapsible" id="card-goods">
   <div class="card-head">
     <span class="chev">▾</span>

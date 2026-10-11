@@ -190,13 +190,38 @@ def _parse_xlsx(data: bytes) -> dict:
             pass
 
 
+def _source_items(invoice_id: int) -> list:
+    """Товары из сохранённого Исходного Excel — БЕЗ записи в БД.
+    Нужно для предварительного Камьёна, пока проверенный файл не на этапе 4."""
+    steps = db.get_steps(invoice_id)
+    if not steps:
+        return []
+    src_id = steps[0]["id"]
+    srcs = [f for f in db.list_files(invoice_id) if f["step_id"] == src_id]
+    if not srcs:
+        return []
+    try:
+        with open(srcs[0]["stored_path"], "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return []
+    parsed = _parse_xlsx(data)
+    out = []
+    for it in parsed.get("items", []):
+        row = {k: (it.get(k, "") or "") for k in ITEM_FIELDS}
+        row["set_count"] = row.get("set_count") or "1"
+        out.append(row)
+    return out
+
+
 def _apply_parsed(invoice_id: int, shipment, invoice, parsed: dict,
                   filename: str, data: bytes, user, replace_source: bool) -> None:
-    """Заполняет поля/товары, сохраняет исходный Excel, отмечает входящие этапы."""
+    """Сохраняет Исходный Excel и поля инвойса, отмечает входящие этапы.
+    Таблицу товаров НЕ заполняем: она строится только из проверенного Камьёна,
+    который загружается на этап 4. До этого из исходника собирается лишь
+    предварительный Камьён (на лету, без записи в БД)."""
     fields = parsed["fields"]
     db.set_invoice_fields(invoice_id, {**fields, "source_file": filename})
-    if parsed["items"]:
-        db.replace_items(invoice_id, parsed["items"])
     steps = db.get_steps(invoice_id)
     first = steps[0]["id"] if steps else None
     if replace_source and first:
@@ -207,11 +232,6 @@ def _apply_parsed(invoice_id: int, shipment, invoice, parsed: dict,
     for s in steps:
         if s["kind"] == "входящий" and s["position"] <= 2:
             db.update_step(s["id"], "готово", "получено из Excel-файла")
-    # Если загрузили готовый Камьён — отмечаем и этап «Камьён»
-    if parsed.get("format") == "camion":
-        for s in steps:
-            if s["position"] == 3:
-                db.update_step(s["id"], "готово", "загружен готовый Камьён")
 
 
 @app.post("/shipments/{shipment_id}/import")
@@ -290,8 +310,9 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
     # Данные инвойса / Товары / Разбивка показываем только после Камьёна на этапе 4.
     # Пока Камьёна нет — предлагаем скачать предварительный Камьён.
     step4 = steps[3] if len(steps) > 3 else None
-    has_source = bool(items)
-    camion_done = bool(step4) and (
+    has_source = bool(invoice["source_file"]) or bool(items)
+    # Товары показываем только когда проверенный Камьён на этапе 4 И есть строки.
+    camion_done = bool(items) and bool(step4) and (
         step4["status"] == "готово" or bool(files_by_step.get(step4["id"]))
     )
     return templates.TemplateResponse(
@@ -589,7 +610,10 @@ def export_camion(request: Request, invoice_id: int, user=Depends(require_user))
     invoice = db.get_invoice(invoice_id)
     if not invoice:
         raise HTTPException(404, "Инвойс не найден")
-    vitems, _ = validate_items(db.get_items(invoice_id))
+    # Если проверенный Камьён уже на этапе 4 — берём товары из БД;
+    # иначе собираем ПРЕДВАРИТЕЛЬНЫЙ из Исходного Excel (без записи в БД).
+    items = db.get_items(invoice_id) or _source_items(invoice_id)
+    vitems, _ = validate_items(items)
     content = camion_export.build_camion_xlsx(invoice, vitems)
     fname = f"Камьён_{invoice['number']}.xlsx"
     return Response(
