@@ -59,6 +59,29 @@
   </form>
 </div>
 
+{# --- Предварительный Камьён: пока Камьён не приложен к этапу 4 --- #}
+{% if has_source and not camion_done %}
+<div class="card" style="border-color:#ffe2b8; background:#fffaf2">
+  <h2>🧾 Предварительный Камьён</h2>
+  <p class="muted" style="margin-top:-8px">Исходный Excel загружен — система собрала
+     <b>предварительный Камьён</b> из инвойса, пакинг-листа и перевода: страна,
+     производитель и русское название подтянуты из справочника, а спорные значения
+     подсвечены жёлтым/красным. Скачай его, проверь и доработай, затем приложи
+     готовый файл к этапу <b>4. Камьён</b> ниже — после этого откроется таблица товаров.</p>
+  <a class="btn" href="/invoices/{{ invoice.id }}/camion.xlsx">⬇️ Скачать предварительный Камьён (Excel)</a>
+  {% if vsummary.checked and (vsummary.bad or vsummary.warn) %}
+  <div class="ed-hint" style="margin-top:10px">В предварительном файле подсвечено:
+    {% if vsummary.bad %}<span class="pill bad">🔴 {{ vsummary.bad }} с ошибкой</span>{% endif %}
+    {% if vsummary.warn %}<span class="pill warn">🟡 {{ vsummary.warn }} под вопросом</span>{% endif %}
+  </div>
+  {% elif not vsummary.checked %}
+  <div class="ed-hint" style="margin-top:10px">Справочник не загружен — автосверка кодов недоступна.
+    <a href="/references">Загрузить TRANSIT/Новинки</a></div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if camion_done %}
 <div class="card collapsible" id="card-info">
   <div class="card-head">
     <span class="chev">▾</span>
@@ -96,7 +119,6 @@
     <span class="chev">▾</span>
     <h2>Товары <span class="cnt">({{ items|length }})</span></h2>
     <span class="tag-collapsed">— нажми, чтобы раскрыть</span>
-    <a class="btn sm" style="margin-left:auto" href="/invoices/{{ invoice.id }}/camion.xlsx">⬇️ Скачать Камьён (Excel)</a>
   </div>
   <div class="card-body">
 
@@ -123,7 +145,8 @@
   <form id="goods-edit" method="post" action="/invoices/{{ invoice.id }}/items" style="margin-top:12px">
     <p class="ed-hint">Правь ячейки прямо здесь — изменения сохраняются по кнопке «Сохранить».
        Можно вставить данные из Excel: скопируй диапазон и вставь (Ctrl+V) в нужную ячейку —
-       заполнится сразу несколько ячеек и строк. Столбец «Производитель» заполняется из справочника.</p>
+       заполнится сразу несколько ячеек и строк. Столбец «Производитель» заполняется из справочника.
+       <b>Камьён на этапе 4 собирается из этой таблицы</b> — после «Сохранить» его файл сразу актуальный.</p>
     <div class="scroll-x" style="border:none"><div id="goods-editor"></div></div>
     <input type="hidden" name="data" id="goods-data">
     <div class="ed-hint" style="margin-top:8px">Итого: кол-во {{ totals.qty }} · сумма {{ totals.total_price }}
@@ -281,6 +304,7 @@ function collectKit(){
 }
 </script>
 {% endif %}
+{% endif %}{# /camion_done #}
 
 <div class="card">
   <h2>Этапы процесса</h2>
@@ -310,6 +334,11 @@ function collectKit(){
       {% if s.note %}<div class="step-note"><span class="lab">заметка:</span> {{ s.note }}</div>{% endif %}
       {% if from_excel %}
         <div class="step-file muted">файл — в разделе «Исходный Excel» ↑</div>
+      {% elif s.position == 3 and camion_done %}
+        <div class="step-file">⬇️ <a href="/invoices/{{ invoice.id }}/camion.xlsx">Скачать актуальный Камьён (Excel)</a>
+          <span class="muted">· собран из таблицы товаров</span></div>
+        <div class="muted" style="font-size:12px; margin-top:3px">Файл обновляется автоматически, когда правишь
+          таблицу товаров выше. Чтобы загрузить переделанный Камьён и обновить таблицу — нажми «Изменить».</div>
       {% elif sfiles %}
         {% for f in sfiles %}
         <div class="step-file">📎 <a href="/files/{{ f.id }}/download">{{ f.original_name }}</a>

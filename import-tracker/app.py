@@ -284,6 +284,16 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
         [{k: (v.get(k, "") or "") for k in _ed_keys} for v in vitems],
         ensure_ascii=False,
     )
+    # Этапность показа:
+    #  - has_source  — загружен Исходный Excel (есть разобранные товары);
+    #  - camion_done — Камьён уже на этапе 4 (приложен файл ИЛИ этап «готово»).
+    # Данные инвойса / Товары / Разбивка показываем только после Камьёна на этапе 4.
+    # Пока Камьёна нет — предлагаем скачать предварительный Камьён.
+    step4 = steps[3] if len(steps) > 3 else None
+    has_source = bool(items)
+    camion_done = bool(step4) and (
+        step4["status"] == "готово" or bool(files_by_step.get(step4["id"]))
+    )
     return templates.TemplateResponse(
         request, "invoice.html",
         {
@@ -293,6 +303,7 @@ def invoice_detail(request: Request, invoice_id: int, camion: int = 0,
             "statuses": db.STATUSES, "items": items, "totals": totals,
             "vitems": vitems, "vsummary": vsummary, "camion_updated": camion,
             "kits": kits, "items_json": items_json, "nav": "invoices",
+            "has_source": has_source, "camion_done": camion_done,
         },
     )
 
